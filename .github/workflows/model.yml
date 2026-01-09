@@ -129,8 +129,22 @@ jobs:
               "prerelease": false
             }')
           
-          echo "upload_url=$(echo $RELEASE_RESPONSE | python3 -c "import sys,json; print(json.load(sys.stdin).get('upload_url','').replace('{?name,label}',''))")" >> $GITHUB_OUTPUT
-          echo "Release created successfully"
+          # Debug: print release response
+          echo "DEBUG: Release response: $RELEASE_RESPONSE"
+          
+          # Extract upload URL properly
+          UPLOAD_URL=$(echo "$RELEASE_RESPONSE" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+upload_url = data.get('upload_url', '')
+# Remove {?name,label} suffix
+if upload_url:
+    upload_url = upload_url.replace('{?name,label}', '')
+print(upload_url)
+")
+          
+          echo "upload_url=$UPLOAD_URL" >> $GITHUB_OUTPUT
+          echo "Release created successfully with upload URL: $UPLOAD_URL"
 
       - name: Upload Model Asset
         run: |

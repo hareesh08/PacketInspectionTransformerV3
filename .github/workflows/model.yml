@@ -13,6 +13,10 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+  releases: read
+
 env:
   MODEL_PATH: model/finetuned_best_model.pth
   MODEL_NAME: finetuned_best_model.pth
@@ -21,6 +25,9 @@ jobs:
   upload-model:
     if: inputs.upload
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      releases: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -48,30 +55,50 @@ jobs:
         run: |
           TAG_NAME="model-${{ inputs.model_version }}"
           BODY="Model: ${{ env.MODEL_NAME }}"
+          
+          echo "Checking for existing release..."
           EXISTING=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG_NAME" || true)
+          
           if echo "$EXISTING" | grep -q '"id"'; then
+            echo "Existing release found, deleting..."
             ID=$(echo "$EXISTING" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
             curl -s -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
               "https://api.github.com/repos/${{ github.repository }}/releases/$ID"
           fi
+          
+          echo "Creating new release..."
           RESP=$(curl -s -X POST \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Content-Type: application/json" \
             --data-raw "{\"tag_name\":\"$TAG_NAME\",\"name\":\"Model ${{ inputs.model_version }}\",\"body\":\"$BODY\",\"draft\":false,\"prerelease\":false}" \
             "https://api.github.com/repos/${{ github.repository }}/releases")
-          echo "Response: $RESP"
-          UPLOAD_URL=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('upload_url','').replace('{?name,label}',''))")
+          
+          echo "Release response: $RESP"
+          
+          # Extract release ID and construct upload URL
+          RELEASE_ID=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+          echo "Release ID: $RELEASE_ID"
+          echo "release_id=$RELEASE_ID" >> $GITHUB_OUTPUT
+          
+          UPLOAD_URL="https://uploads.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets"
           echo "upload_url=$UPLOAD_URL" >> $GITHUB_OUTPUT
 
       - name: Upload Model Asset
         run: |
+          echo "Uploading model asset..."
           curl -s -X POST \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @"${{ env.MODEL_PATH }}" \
-            "${{ steps.create_release.outputs.upload_url }}?name=${{ env.MODEL_NAME }}"
-          echo "Model uploaded!"
+            "${{ steps.create_release.outputs.upload_url }}?name=${{ env.MODEL_NAME }}&label=Model"
+          UPLOAD_STATUS=$?
+          if [ $UPLOAD_STATUS -eq 0 ]; then
+            echo "Model uploaded successfully!"
+          else
+            echo "Error uploading model (exit code: $UPLOAD_STATUS)"
+            exit $UPLOAD_STATUS
+          fi
 
   download-model:
     runs-on: ubuntu-latest
@@ -79,22 +106,75 @@ jobs:
       - name: Get latest release
         id: latest_release
         run: |
-          ASSETS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/latest" | \
-            python3 -c "import sys,json; print(json.load(sys.stdin).get('assets',[]))")
-          ID=$(echo "$ASSETS" | python3 -c "import sys,json; n='${{ env.MODEL_NAME }}'; print([a['id'] for a in json.load(sys.stdin) if n in a.get('name','')][0] if any(n in a.get('name','') for a in json.load(sys.stdin)) else '')")
-          [ -n "$ID" ] && echo "asset_id=$ID" >> $GITHUB_OUTPUT
+          echo "Fetching latest release..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/latest")
+          
+          # Extract HTTP status code (last line)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
+          
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Error fetching release (HTTP $HTTP_CODE)"
+            echo "Response: $RESPONSE_BODY"
+            echo "asset_id=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+           
+          # Check if response contains an error message
+          if echo "$RESPONSE_BODY" | grep -q '"message":'; then
+            echo "GitHub API error: $(echo "$RESPONSE_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('message', 'Unknown error'))")"
+            echo "asset_id=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+           
+          # Extract assets safely
+          ASSETS=$(echo "$RESPONSE_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('assets',[]))" 2>/dev/null || echo "[]")
+          echo "Found assets: $ASSETS"
+           
+          # Find the model asset ID
+          MODEL_NAME="${{ env.MODEL_NAME }}"
+          ID=$(echo "$ASSETS" | python3 -c "
+          import sys, json
+          assets = json.load(sys.stdin) if sys.stdin.strip() else []
+          for a in assets:
+              if '$MODEL_NAME' in a.get('name', ''):
+                  print(a['id'])
+                  break
+          " 2>/dev/null)
+           
+          if [ -n "$ID" ]; then
+            echo "Found asset ID: $ID"
+            echo "asset_id=$ID" >> $GITHUB_OUTPUT
+          else
+            echo "Asset not found"
+            echo "asset_id=" >> $GITHUB_OUTPUT
+          fi
 
       - name: Download model asset
         id: download
         if: steps.latest_release.outputs.asset_id
         run: |
+          echo "Downloading model asset..."
           curl -L -o "${{ env.MODEL_PATH }}" \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/releases/assets/${{ steps.latest_release.outputs.asset_id }}"
-          echo "model_path=${{ env.MODEL_PATH }}" >> $GITHUB_OUTPUT
+          DOWNLOAD_STATUS=$?
+          if [ $DOWNLOAD_STATUS -eq 0 ]; then
+            echo "Download complete"
+            echo "model_path=${{ env.MODEL_PATH }}" >> $GITHUB_OUTPUT
+          else
+            echo "Error downloading model (exit code: $DOWNLOAD_STATUS)"
+            exit $DOWNLOAD_STATUS
+          fi
 
       - name: Verify model file
         if: steps.download.outputs.model_path
         run: |
-          ls -lh "${{ env.MODEL_PATH }}"
+          if [ -f "${{ env.MODEL_PATH }}" ]; then
+            echo "Model file downloaded successfully:"
+            ls -lh "${{ env.MODEL_PATH }}"
+          else
+            echo "ERROR: Model file not found after download"
+            exit 1
+          fi

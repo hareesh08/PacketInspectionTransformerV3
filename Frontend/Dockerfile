@@ -11,13 +11,13 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy package files first for better caching
-COPY package*.json ./
+COPY Frontend/package*.json ./
 
 # Install dependencies
 RUN npm ci --quiet
 
 # Copy source code
-COPY . .
+COPY Frontend/ .
 
 # Build the application
 # Build with production mode to minimize bundle size
@@ -28,7 +28,7 @@ RUN npm run build
 # ----------------------------------------------------------------------------
 FROM nginx:alpine AS production
 
-# Copy nginx configuration
+# Copy nginx configuration from root directory
 COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy built assets from builder

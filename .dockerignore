@@ -90,6 +90,10 @@ node_modules/
 Frontend/node_modules/
 *.local
 
+# Keep package-lock.json for reproducible builds
+!package-lock.json
+!Frontend/package-lock.json
+
 # ----------------------------------------------------------------------------
 # Build outputs (will be built inside container)
 # ----------------------------------------------------------------------------

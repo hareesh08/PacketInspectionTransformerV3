@@ -120,6 +120,7 @@ jobs:
           fi
 
   download-model:
+    if: inputs.upload == false && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code

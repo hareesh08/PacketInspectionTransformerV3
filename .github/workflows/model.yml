@@ -27,77 +27,15 @@ jobs:
         with:
           lfs: true
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install HuggingFace Hub
-        run: |
-          pip install -U huggingface_hub
-
-      - name: Check model file
-        id: check-local-model
-        run: |
-          if [ -f "${{ env.MODEL_PATH }}" ]; then
-            echo "Model file found locally"
-            echo "local_model_exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "Model not found locally"
-            echo "local_model_exists=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Download model from HuggingFace
-        id: download-model
-        if: steps.check-local-model.outputs.local_model_exists != 'true'
-        run: |
-          echo "Model not found locally, downloading from HuggingFace..."
-          
-          mkdir -p model
-          
-          # Try huggingface-cli first
-          if command -v huggingface-cli &> /dev/null; then
-            echo "Downloading using huggingface-cli..."
-            huggingforce-cli download PacketInspectionTransformer/finetuned_best_model \
-              --local-dir "${{ env.MODEL_PATH }}" \
-              --local-dir-use-symlinks false || \
-            python3 -c "
-import huggingface_hub
-huggingface_hub.hf_hub_download(
-    repo_id='PacketInspectionTransformer/finetuned_best_model',
-    filename='finetuned_best_model.pth',
-    local_dir='${{ env.MODEL_PATH }}',
-    local_dir_use_symlinks=False
-)"
-          else
-            # Fallback to Python API
-            python3 -c "
-import huggingface_hub
-huggingface_hub.hf_hub_download(
-    repo_id='PacketInspectionTransformer/finetuned_best_model',
-    filename='finetuned_best_model.pth',
-    local_dir='${{ env.MODEL_PATH }}',
-    local_dir_use_symlinks=False
-)"
-          fi
-          
-          # Verify download
-          if [ -f "${{ env.MODEL_PATH }}" ]; then
-            echo "Model downloaded successfully"
-            ls -lh "${{ env.MODEL_PATH }}"
-          else
-            echo "ERROR: Model download failed!"
-            exit 1
-          fi
-
-      - name: Check model file exists
+      - name: Verify model file exists
         id: check_model
         run: |
           if [ -f "${{ env.MODEL_PATH }}" ]; then
             echo "Model file found"
             echo "size=$(ls -lh ${{ env.MODEL_PATH }} | awk '{print $5}')" >> $GITHUB_OUTPUT
           else
-            echo "ERROR: Model file not found!"
+            echo "ERROR: Model file not found at ${{ env.MODEL_PATH }}"
+            echo "Please ensure the model is committed to the repository with Git LFS"
             exit 1
           fi
 

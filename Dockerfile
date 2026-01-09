@@ -27,17 +27,18 @@ WORKDIR /model
 
 # Model configuration
 ARG MODEL_VERSION="latest"
-ENV MODEL_URL="https://github.com/${{ github.repository }}/releases/download/model-${MODEL_VERSION}/packet_inspection_model.pth"
+ARG GITHUB_REPOSITORY=""
 ENV MODEL_PATH="model/finetuned_best_model.pth"
 
 # Download model from GitHub releases (if available)
-RUN if [ "${MODEL_VERSION}" != "none" ]; then \
-    echo "Downloading model version ${MODEL_VERSION}..." && \
+RUN if [ -n "${GITHUB_REPOSITORY}" ] && [ "${MODEL_VERSION}" != "none" ]; then \
+    echo "Downloading model version ${MODEL_VERSION} from ${GITHUB_REPOSITORY}..." && \
+    MODEL_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/model-${MODEL_VERSION}/finetuned_best_model.pth" && \
     curl -L -o ${MODEL_PATH} \
       -H "Accept: application/octet-stream" \
       "${MODEL_URL}" || echo "Model download failed, will use fallback"; \
   else \
-    echo "No model version specified, skipping download"; \
+    echo "No model download configured, will use local copy"; \
   fi
 
 # ----------------------------------------------------------------------------
@@ -64,10 +65,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy application code
 COPY --chown=appuser:appuser . .
 
-# Copy model file (from download stage or local copy)
-COPY --from=model-downloader /model/model/finetuned_best_model.pth \
-      /app/model/finetuned_best_model.pth 2>/dev/null || \
-    echo "Model file not found - application will use fallback"
+# Ensure model directory exists
+RUN mkdir -p /app/model
+
+# Copy model file if it doesn't exist in the copied application code
+# Model should be included via LFS during build context
+RUN if [ ! -f /app/model/finetuned_best_model.pth ]; then \
+    echo "WARNING: Model file not found in build context"; \
+  else \
+    echo "Model file found: $(ls -lh /app/model/finetuned_best_model.pth)"; \
+  fi
 
 # Create non-root user
 RUN useradd -m appuser && chown -R appuser:appuser /app

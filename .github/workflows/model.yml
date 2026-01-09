@@ -50,6 +50,8 @@ jobs:
       - name: Pull LFS files
         run: |
           git lfs pull
+          echo "Verifying model file in build context:"
+          ls -lh model/finetuned_best_model.pth || echo "Model file not found"
 
       - name: Verify model file exists
         id: check_model
@@ -128,6 +130,8 @@ jobs:
       - name: Pull LFS files
         run: |
           git lfs pull
+          echo "Verifying model file in build context:"
+          ls -lh model/finetuned_best_model.pth || echo "Model file not found"
 
       - name: Get latest release
         id: latest_release
@@ -225,6 +229,8 @@ jobs:
       - name: Pull LFS files
         run: |
           git lfs pull
+          echo "Verifying model file in build context:"
+          ls -lh model/finetuned_best_model.pth || echo "Model file not found"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -259,6 +265,9 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            MODEL_VERSION=${{ inputs.model_version || 'latest' }}
+            GITHUB_REPOSITORY=${{ github.repository }}
 
   run-makefile:
     if: inputs.build_docker || github.event_name == 'push'

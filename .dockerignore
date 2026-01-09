@@ -57,13 +57,19 @@ parts/
 sdist/
 var/
 wheels/
-*.pth
 venv/
 ENV/
 .venv/
 env/
 venv/
 ENV/
+
+# Model files should be included (remove *.pth from ignore)
+# Exception: Keep model files for Docker builds
+!model/*.pth
+!model/*.pt
+!model/*.bin
+!model/*.safetensors
 
 # ----------------------------------------------------------------------------
 # Testing

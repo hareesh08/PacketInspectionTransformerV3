@@ -9,13 +9,16 @@ services:
       dockerfile: Dockerfile
     container_name: packet-inspection-backend
     restart: unless-stopped
+    # Use environment variable for port, default to 8000
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     volumes:
       - ./model:/app/model:ro
       - ./logs:/app/logs
     environment:
       - PYTHONPATH=/app
+      - HOST=0.0.0.0
+      - PORT=8000
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -28,12 +31,13 @@ services:
     image: nginx:alpine
     container_name: packet-inspection-nginx
     restart: unless-stopped
+    # Use environment variables for ports, default to 80/443
     ports:
-      - "80:80"
-      - "443:443"
+      - "${WEB_PORT:-80}:80"
+      - "${SSL_PORT:-443}:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./dashboard/dist:/var/www/html/dist:ro
+      - ./Frontend/dist:/var/www/html/dist:ro
       - ./logs/nginx:/var/log/nginx
     depends_on:
       backend:

@@ -6,27 +6,42 @@
 import axios, { AxiosError, AxiosInstance, AxiosResponse } from 'axios';
 import { ModelInfoResponse, Notification, LogEntry } from '@/types';
 
-// Auto-detect API base URL based on current host
+// Environment detection
+const isProduction = import.meta.env.PROD;
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+// Auto-detect API base URL based on current environment
 function getApiBaseUrl(): string {
   const envUrl = import.meta.env.VITE_API_URL;
   
-  // If set to "auto" or not set, detect automatically
-  if (!envUrl || envUrl === 'auto') {
-    const { hostname, protocol } = window.location;
-    // If running on localhost, use localhost:8000
-    // Otherwise use the same host on port 8000
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:8000';
-    }
-    // For remote servers, use same hostname with port 8000
-    return `${protocol}//${hostname}:8000`;
+  // If explicitly set, use it
+  if (envUrl && envUrl !== 'auto') {
+    return envUrl;
   }
   
-  return envUrl;
+  // Auto-detection logic
+  if (isLocalhost) {
+    // Local development: use localhost with configured port
+    const port = import.meta.env.VITE_API_PORT || '8000';
+    return `http://localhost:${port}`;
+  }
+  
+  // Production: use same host with configured port
+  const port = import.meta.env.VITE_API_PORT || '8000';
+  const { hostname, protocol } = window.location;
+  return `${protocol}//${hostname}:${port}`;
+}
+
+// Get WebSocket URL for SSE connections
+function getWebSocketUrl(): string {
+  const baseUrl = getApiBaseUrl();
+  // Replace http/https with ws/wss for WebSocket connections
+  return baseUrl.replace(/^http/, 'ws');
 }
 
 // API Base URL - configurable via environment variable
 const API_BASE_URL = getApiBaseUrl();
+const WS_BASE_URL = getWebSocketUrl();
 
 // Request timeout in milliseconds (increased for large file scans)
 const REQUEST_TIMEOUT = 300000; // 5 minutes
@@ -311,15 +326,22 @@ class ApiClient {
     onMessage: (notification: Notification) => void,
     onError?: (error: Event) => void
   ): EventSource {
-    const eventSource = new EventSource(`${API_BASE_URL}/notifications/stream`);
+    const eventSource = new EventSource(`${WS_BASE_URL}/notifications/stream`);
     
     eventSource.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data);
-        onMessage(data as Notification);
+        const parsedData = JSON.parse(event.data);
+        // Add timestamp if not present (backend may not send it)
+        const notification: Notification = {
+          ...parsedData,
+          timestamp: parsedData.timestamp || new Date().toISOString(),
+        };
+        onMessage(notification);
       } catch {
         onMessage({
+          id: `local-${Date.now()}`,
           event: event.type,
+          timestamp: new Date().toISOString(),
           data: JSON.parse(event.data || '{}'),
         });
       }
@@ -367,7 +389,7 @@ class ApiClient {
     onLog: (log: LogEntry) => void,
     onError?: (error: Event) => void
   ): EventSource {
-    const eventSource = new EventSource(`${API_BASE_URL}/logs/stream`);
+    const eventSource = new EventSource(`${WS_BASE_URL}/logs/stream`);
     
     eventSource.onmessage = (event) => {
       try {

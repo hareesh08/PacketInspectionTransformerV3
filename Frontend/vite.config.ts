@@ -7,9 +7,34 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 8080,
+    port: parseInt(process.env.VITE_PORT || "8080"),
     hmr: {
       overlay: false,
+    },
+    // Proxy API requests to backend in development
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/ws': {
+        target: 'ws://localhost:8000',
+        ws: true,
+        changeOrigin: true,
+        secure: false,
+      },
+      '/notifications': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+      },
+      '/logs': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
@@ -18,5 +43,17 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
     extensions: [".js", ".jsx", ".ts", ".tsx", ".json"],
+  },
+  // Build settings for production
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: mode === "production",
+        drop_debugger: mode === "production",
+      },
+    },
   },
 }));

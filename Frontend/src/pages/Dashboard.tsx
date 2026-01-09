@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Scan, AlertTriangle, Shield, HardDrive, RefreshCw, Bell } from 'lucide-react';
+import { Scan, AlertTriangle, Shield, HardDrive, RefreshCw } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { ThreatChart } from '@/components/dashboard/ThreatChart';
@@ -67,7 +67,7 @@ export default function Dashboard() {
   }, []);
 
   // Setup notifications
-  const { isConnected, sendTestNotification, notifications } = useNotifications({
+  const { isConnected, notifications } = useNotifications({
     onThreatDetected: (notification) => {
       toast.error('🚨 Threat Detected!', {
         description: `Source: ${notification.data.source || 'Unknown'} | Risk: ${notification.data.risk_level || 'Unknown'}`,
@@ -85,13 +85,6 @@ export default function Dashboard() {
   const handleRefresh = () => {
     fetchDashboardData();
     toast.info('Refreshing dashboard data...');
-  };
-
-  const handleTestNotification = async () => {
-    const success = await sendTestNotification();
-    if (!success) {
-      toast.error('Failed to send test notification');
-    }
   };
 
   // Show loading state while data is being fetched
@@ -135,15 +128,6 @@ export default function Dashboard() {
         <Button
           variant="outline"
           size="sm"
-          onClick={handleTestNotification}
-          className="gap-2"
-        >
-          <Bell className="h-4 w-4" />
-          Test Notification
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
           onClick={handleRefresh}
           className="gap-2"
         >
@@ -157,7 +141,7 @@ export default function Dashboard() {
         <div className="mb-4 p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive">
           <p className="font-medium">Failed to connect to backend</p>
           <p className="text-sm mt-1">{error}</p>
-          <p className="text-sm mt-2">Make sure the backend is running at http://localhost:8000</p>
+          <p className="text-sm mt-2">Make sure the backend is running at http://157.245.97.220</p>
         </div>
       )}
 

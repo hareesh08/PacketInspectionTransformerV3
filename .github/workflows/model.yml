@@ -28,6 +28,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Download model from HuggingFace or external source
+        id: download-external
+        if: '! -f "${{ env.MODEL_PATH }}"'
+        run: |
+          echo "Model not found locally, checking for external source..."
+          # Check if there's a model URL provided or use a default
+          MODEL_URL="${MODEL_DOWNLOAD_URL:-}"
+          
+          if [ -n "$MODEL_URL" ]; then
+            echo "Downloading model from external source..."
+            mkdir -p model
+            curl -L -o "${{ env.MODEL_PATH }}" "$MODEL_URL"
+            echo "Model downloaded from external source"
+          else
+            echo "No external model URL configured and model not found locally"
+            echo "Please ensure model/finetuned_best_model.pth exists locally"
+            exit 1
+          fi
+
       - name: Check model file exists
         id: check_model
         run: |

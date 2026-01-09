@@ -162,13 +162,14 @@ jobs:
            
           MODEL_NAME="${{ env.MODEL_NAME }}"
           ID=$(echo "$ASSETS" | python3 -c "
-          import sys, json
-          assets = json.load(sys.stdin) if sys.stdin.strip() else []
-          for a in assets:
-              if '$MODEL_NAME' in a.get('name', ''):
-                  print(a['id'])
-                  break
-          " 2>/dev/null)
+import sys, json
+assets_str = sys.stdin.read().strip()
+assets = json.loads(assets_str) if assets_str else []
+for a in assets:
+    if '$MODEL_NAME' in a.get('name', ''):
+        print(a['id'])
+        break
+" 2>/dev/null)
            
           if [ -n "$ID" ]; then
             echo "Found asset ID: $ID"

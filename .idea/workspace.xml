@@ -4,10 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="8841923a-3a8c-410b-8e39-f8f2178fb268" name="Changes" comment="fix model.yml">
-      <change beforePath="$PROJECT_DIR$/.dockerignore" beforeDir="false" afterPath="$PROJECT_DIR$/.dockerignore" afterDir="false" />
+    <list default="true" id="8841923a-3a8c-410b-8e39-f8f2178fb268" name="Changes" comment="fix">
       <change beforePath="$PROJECT_DIR$/.github/workflows/model.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/model.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/Dockerfile" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -100,7 +98,7 @@
       <workItem from="1767948834710" duration="22259000" />
       <workItem from="1767973435816" duration="9264000" />
       <workItem from="1767985823409" duration="464000" />
-      <workItem from="1767990399675" duration="323000" />
+      <workItem from="1767990399675" duration="681000" />
     </task>
     <task id="LOCAL-00001" summary="updated ui,notification, deployment">
       <option name="closed" value="true" />
@@ -278,7 +276,23 @@
       <option name="project" value="LOCAL" />
       <updated>1767990438772</updated>
     </task>
-    <option name="localTasksCounter" value="23" />
+    <task id="LOCAL-00023" summary="Fixed the following issues:&#10;&#10;Dockerfile line 30: Removed GitHub Actions template syntax ${{ github.repository }} and replaced with build arg GITHUB_REPOSITORY that gets passed during build&#10;Model file inclusion: Removed *.pth from .dockerignore and added explicit exceptions for model files in the model/ directory&#10;Build args: Updated workflow to pass GITHUB_REPOSITORY and MODEL_VERSION as build arguments&#10;LFS verification: Added verification step in workflow to confirm model file is present before building&#10;The workflow now:&#10;&#10;Properly pulls LFS files before Docker build&#10;Includes model files in the build context (via updated .dockerignore)&#10;Passes repository info as build args instead of using GitHub Actions syntax in Dockerfile&#10;Verifies model files are available before building&#10;Review Changes">
+      <option name="closed" value="true" />
+      <created>1767990744968</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1767990744968</updated>
+    </task>
+    <task id="LOCAL-00024" summary="fix">
+      <option name="closed" value="true" />
+      <created>1767990936945</created>
+      <option name="number" value="00024" />
+      <option name="presentableId" value="LOCAL-00024" />
+      <option name="project" value="LOCAL" />
+      <updated>1767990936945</updated>
+    </task>
+    <option name="localTasksCounter" value="25" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -292,12 +306,13 @@
     <MESSAGE value="fixing front end" />
     <MESSAGE value="docker-deploy.sh fix" />
     <MESSAGE value="deployment fix" />
-    <MESSAGE value="fix" />
     <MESSAGE value="ngnix fix" />
     <MESSAGE value="Fixed the WebSocket URL in Frontend/src/lib/api.ts to use same-origin approach" />
     <MESSAGE value="updated" />
     <MESSAGE value="fix model.yml" />
-    <option name="LAST_COMMIT_MESSAGE" value="fix model.yml" />
+    <MESSAGE value="Fixed the following issues:&#10;&#10;Dockerfile line 30: Removed GitHub Actions template syntax ${{ github.repository }} and replaced with build arg GITHUB_REPOSITORY that gets passed during build&#10;Model file inclusion: Removed *.pth from .dockerignore and added explicit exceptions for model files in the model/ directory&#10;Build args: Updated workflow to pass GITHUB_REPOSITORY and MODEL_VERSION as build arguments&#10;LFS verification: Added verification step in workflow to confirm model file is present before building&#10;The workflow now:&#10;&#10;Properly pulls LFS files before Docker build&#10;Includes model files in the build context (via updated .dockerignore)&#10;Passes repository info as build args instead of using GitHub Actions syntax in Dockerfile&#10;Verifies model files are available before building&#10;Review Changes" />
+    <MESSAGE value="fix" />
+    <option name="LAST_COMMIT_MESSAGE" value="fix" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/PacketInspectionTransformerV3$run.coverage" NAME="run Coverage Results" MODIFIED="1767938496545" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />

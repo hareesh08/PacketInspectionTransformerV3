@@ -32,11 +32,12 @@ function getApiBaseUrl(): string {
   return `${protocol}//${hostname}:${port}`;
 }
 
-// Get WebSocket URL for SSE connections
+// Get WebSocket URL for SSE connections (same-origin, goes through Nginx)
 function getWebSocketUrl(): string {
-  const baseUrl = getApiBaseUrl();
-  // Replace http/https with ws/wss for WebSocket connections
-  return baseUrl.replace(/^http/, 'ws');
+  // Use same-origin approach - WebSocket connects through Nginx proxy
+  const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+  // location.host includes port if non-standard, works for both dev and prod
+  return `${protocol}://${location.host}`;
 }
 
 // API Base URL - configurable via environment variable

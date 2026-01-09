@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Bell, Search, Terminal, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { LogViewer } from '@/components/logs/LogViewer';
+import { LogViewer } from '@/components/logs/LogViewer.tsx';
 import {
   DropdownMenu,
   DropdownMenuTrigger,

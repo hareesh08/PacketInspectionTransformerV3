@@ -5,6 +5,7 @@ set -e
 # Packet Inspection Transformer - Docker Deployment Script
 # ============================================================================
 # Usage:
+#   ./docker-deploy.sh install  - Install Docker (if not present)
 #   ./docker-deploy.sh build    - Build Docker images
 #   ./docker-deploy.sh up       - Start containers
 #   ./docker-deploy.sh down     - Stop containers
@@ -29,13 +30,61 @@ log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+# Install Docker and Docker Compose if not present
+install_docker() {
+    log_info "Installing Docker and Docker Compose..."
+    
+    # Check if running as root
+    if [ "$EUID" -ne 0 ]; then
+        log_warn "Not running as root, will use sudo"
+        SUDO="sudo"
+    else
+        SUDO=""
+    fi
+    
+    # Install dependencies
+    $SUDO apt-get update -qq
+    $SUDO apt-get install -y -qq curl ca-certificates gnupg lsb-release
+    
+    # Install Docker
+    if ! command -v docker &> /dev/null; then
+        log_info "Installing Docker Engine..."
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | $SUDO gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | $SUDO tee /etc/apt/sources.list.d/docker.list > /dev/null
+        $SUDO apt-get update -qq
+        $SUDO apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin
+        $SUDO usermod -aG docker $USER
+        log_success "Docker installed successfully"
+    else
+        log_success "Docker is already installed"
+    fi
+    
+    # Install Docker Compose v2
+    if ! docker compose version &> /dev/null; then
+        log_info "Installing Docker Compose..."
+        $SUDO curl -SL https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+        $SUDO chmod +x /usr/local/bin/docker-compose
+        log_success "Docker Compose installed"
+    else
+        log_success "Docker Compose is already installed"
+    fi
+    
+    # Start Docker daemon if not running
+    if ! pgrep -x dockerd > /dev/null; then
+        log_info "Starting Docker daemon..."
+        $SUDO service docker start
+    fi
+    
+    log_success "Docker installation completed"
+}
+
 check_docker() {
     if ! command -v docker &> /dev/null; then
-        log_error "Docker is not installed. Please install Docker first."
+        log_error "Docker is not installed. Run './docker-deploy.sh install' to install it."
         exit 1
     fi
     if ! docker ps &> /dev/null; then
-        log_error "Docker daemon is not running."
+        log_error "Docker daemon is not running. Run 'sudo service docker start'."
         exit 1
     fi
 }
@@ -135,9 +184,15 @@ show_help() {
 }
 
 main() {
-    check_docker
-    
     command="${1:-help}"
+    
+    # install command doesn't require docker to be running
+    if [ "$command" = "install" ]; then
+        install_docker
+        exit 0
+    fi
+    
+    check_docker
     
     case "$command" in
         build)   do_build ;;

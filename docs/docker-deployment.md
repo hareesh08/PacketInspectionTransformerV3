@@ -4,14 +4,13 @@ This guide explains how to deploy Packet Inspection Transformer using Docker con
 
 ## Prerequisites
 
-- Docker installed on the server
-- Docker Compose (v2.0+)
+- Ubuntu/Debian Linux server
 - Git to clone the repository
 - Model file (uploaded via SCP)
 
 ## Quick Start
 
-### 1. Clone and Setup
+### 1. Clone the Repository
 
 ```bash
 # Clone the repository
@@ -25,12 +24,19 @@ mkdir -p model
 scp finetuned_best_model.pth user@<VM_IP>:/root/PacketInspectionTransformerV3/model/
 ```
 
-### 2. Deploy with Docker
+### 2. Install Docker (Auto-Install)
 
 ```bash
 # Make deployment script executable
 chmod +x deploy/docker-deploy.sh
 
+# Install Docker and Docker Compose (if not already installed)
+sudo ./deploy/docker-deploy.sh install
+```
+
+### 3. Deploy with Docker
+
+```bash
 # Build and start containers
 sudo ./deploy/docker-deploy.sh build
 sudo ./deploy/docker-deploy.sh up
@@ -45,6 +51,9 @@ sudo ./deploy/docker-deploy.sh up
 ## Available Commands
 
 ```bash
+# Install Docker (run once)
+sudo ./deploy/docker-deploy.sh install
+
 # Build images
 sudo ./deploy/docker-deploy.sh build
 
@@ -155,3 +164,20 @@ git pull
 sudo ./deploy/docker-deploy.sh down
 sudo ./deploy/docker-deploy.sh build
 sudo ./deploy/docker-deploy.sh up
+```
+
+## Auto-Install Details
+
+The deployment script automatically installs:
+
+- **Docker Engine** - Latest stable version from official repository
+- **Docker Compose** - V2 plugin for container orchestration
+- **Required dependencies** - curl, ca-certificates, gnupg, lsb-release
+
+The installation:
+1. Adds Docker's official GPG key
+2. Adds Docker repository to apt sources
+3. Installs Docker CE, CLI, and containerd
+4. Sets up Docker Compose
+5. Adds user to docker group (logout/login required for group changes)
+6. Starts Docker daemon

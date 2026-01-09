@@ -1,0 +1,47 @@
+{
+  "detection": {
+    "confidence_threshold": 0.7,
+    "low_risk_threshold": 0.3,
+    "medium_risk_threshold": 0.5,
+    "high_risk_threshold": 0.7,
+    "critical_threshold": 0.9
+  },
+  "streaming": {
+    "chunk_size": 512,
+    "window_size": 1500,
+    "max_file_size": 104857600,
+    "download_timeout": 30
+  },
+  "model": {
+    "model_path": "model/finetuned_best_model.pth",
+    "vocab_size": 259,
+    "d_model": 768,
+    "nhead": 12,
+    "num_layers": 12,
+    "dim_feedforward": 3072,
+    "temperature": 1.0,
+    "dropout": 0.1
+  },
+  "database": {
+    "database_url": "sqlite:///threats.db",
+    "database_path": "threats.db"
+  },
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "debug": false
+  },
+  "logging": {
+    "log_level": "INFO",
+    "log_format": "json",
+    "logs_dir": "logs"
+  },
+  "security": {
+    "api_key": null,
+    "rate_limit_requests": 100
+  },
+  "performance": {
+    "batch_size": 32,
+    "max_concurrent_scans": 10
+  }
+}

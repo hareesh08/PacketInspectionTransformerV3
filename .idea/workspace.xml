@@ -4,9 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="8841923a-3a8c-410b-8e39-f8f2178fb268" name="Changes" comment="fix">
-      <change beforePath="$PROJECT_DIR$/.github/workflows/model.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/model.yml" afterDir="false" />
-    </list>
+    <list default="true" id="8841923a-3a8c-410b-8e39-f8f2178fb268" name="Changes" comment="Recoded all three GitHub Actions workflows for LFS and Docker cloud deployment:&#10;&#10;ci.yml - Continuous Integration with LFS support:&#10;&#10;Proper LFS checkout and pull for model files&#10;Backend testing with model verification&#10;Frontend linting and building&#10;Security scanning with Trivy&#10;Docker build verification with matrix strategy&#10;Python code quality checks (Black, isort, Flake8)&#10;cd.yml - Continuous Deployment to cloud:&#10;&#10;LFS model integration in Docker builds&#10;Multi-platform Docker image builds (linux/amd64)&#10;Push to GitHub Container Registry (ghcr.io)&#10;SSH-based deployment to cloud servers&#10;Health checks for backend and frontend&#10;Automatic changelog generation&#10;GitHub release creation with Docker image tags&#10;Rollback capability via workflow_dispatch&#10;model.yml - LFS Model Management:&#10;&#10;Upload models to GitHub Releases&#10;Download models from releases&#10;Model integrity verification with SHA256&#10;PyTorch model load testing&#10;Automatic Docker rebuild on model updates&#10;Proper LFS file handling throughout&#10;All workflows are optimized for Git LFS, include proper error handling, and support cloud deployment scenarios." />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -98,7 +96,7 @@
       <workItem from="1767948834710" duration="22259000" />
       <workItem from="1767973435816" duration="9264000" />
       <workItem from="1767985823409" duration="464000" />
-      <workItem from="1767990399675" duration="681000" />
+      <workItem from="1767990399675" duration="930000" />
     </task>
     <task id="LOCAL-00001" summary="updated ui,notification, deployment">
       <option name="closed" value="true" />
@@ -292,7 +290,23 @@
       <option name="project" value="LOCAL" />
       <updated>1767990936945</updated>
     </task>
-    <option name="localTasksCounter" value="25" />
+    <task id="LOCAL-00025" summary="fix">
+      <option name="closed" value="true" />
+      <created>1767991115830</created>
+      <option name="number" value="00025" />
+      <option name="presentableId" value="LOCAL-00025" />
+      <option name="project" value="LOCAL" />
+      <updated>1767991115830</updated>
+    </task>
+    <task id="LOCAL-00026" summary="Recoded all three GitHub Actions workflows for LFS and Docker cloud deployment:&#10;&#10;ci.yml - Continuous Integration with LFS support:&#10;&#10;Proper LFS checkout and pull for model files&#10;Backend testing with model verification&#10;Frontend linting and building&#10;Security scanning with Trivy&#10;Docker build verification with matrix strategy&#10;Python code quality checks (Black, isort, Flake8)&#10;cd.yml - Continuous Deployment to cloud:&#10;&#10;LFS model integration in Docker builds&#10;Multi-platform Docker image builds (linux/amd64)&#10;Push to GitHub Container Registry (ghcr.io)&#10;SSH-based deployment to cloud servers&#10;Health checks for backend and frontend&#10;Automatic changelog generation&#10;GitHub release creation with Docker image tags&#10;Rollback capability via workflow_dispatch&#10;model.yml - LFS Model Management:&#10;&#10;Upload models to GitHub Releases&#10;Download models from releases&#10;Model integrity verification with SHA256&#10;PyTorch model load testing&#10;Automatic Docker rebuild on model updates&#10;Proper LFS file handling throughout&#10;All workflows are optimized for Git LFS, include proper error handling, and support cloud deployment scenarios.">
+      <option name="closed" value="true" />
+      <created>1767991330226</created>
+      <option name="number" value="00026" />
+      <option name="presentableId" value="LOCAL-00026" />
+      <option name="project" value="LOCAL" />
+      <updated>1767991330226</updated>
+    </task>
+    <option name="localTasksCounter" value="27" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -312,7 +326,8 @@
     <MESSAGE value="fix model.yml" />
     <MESSAGE value="Fixed the following issues:&#10;&#10;Dockerfile line 30: Removed GitHub Actions template syntax ${{ github.repository }} and replaced with build arg GITHUB_REPOSITORY that gets passed during build&#10;Model file inclusion: Removed *.pth from .dockerignore and added explicit exceptions for model files in the model/ directory&#10;Build args: Updated workflow to pass GITHUB_REPOSITORY and MODEL_VERSION as build arguments&#10;LFS verification: Added verification step in workflow to confirm model file is present before building&#10;The workflow now:&#10;&#10;Properly pulls LFS files before Docker build&#10;Includes model files in the build context (via updated .dockerignore)&#10;Passes repository info as build args instead of using GitHub Actions syntax in Dockerfile&#10;Verifies model files are available before building&#10;Review Changes" />
     <MESSAGE value="fix" />
-    <option name="LAST_COMMIT_MESSAGE" value="fix" />
+    <MESSAGE value="Recoded all three GitHub Actions workflows for LFS and Docker cloud deployment:&#10;&#10;ci.yml - Continuous Integration with LFS support:&#10;&#10;Proper LFS checkout and pull for model files&#10;Backend testing with model verification&#10;Frontend linting and building&#10;Security scanning with Trivy&#10;Docker build verification with matrix strategy&#10;Python code quality checks (Black, isort, Flake8)&#10;cd.yml - Continuous Deployment to cloud:&#10;&#10;LFS model integration in Docker builds&#10;Multi-platform Docker image builds (linux/amd64)&#10;Push to GitHub Container Registry (ghcr.io)&#10;SSH-based deployment to cloud servers&#10;Health checks for backend and frontend&#10;Automatic changelog generation&#10;GitHub release creation with Docker image tags&#10;Rollback capability via workflow_dispatch&#10;model.yml - LFS Model Management:&#10;&#10;Upload models to GitHub Releases&#10;Download models from releases&#10;Model integrity verification with SHA256&#10;PyTorch model load testing&#10;Automatic Docker rebuild on model updates&#10;Proper LFS file handling throughout&#10;All workflows are optimized for Git LFS, include proper error handling, and support cloud deployment scenarios." />
+    <option name="LAST_COMMIT_MESSAGE" value="Recoded all three GitHub Actions workflows for LFS and Docker cloud deployment:&#10;&#10;ci.yml - Continuous Integration with LFS support:&#10;&#10;Proper LFS checkout and pull for model files&#10;Backend testing with model verification&#10;Frontend linting and building&#10;Security scanning with Trivy&#10;Docker build verification with matrix strategy&#10;Python code quality checks (Black, isort, Flake8)&#10;cd.yml - Continuous Deployment to cloud:&#10;&#10;LFS model integration in Docker builds&#10;Multi-platform Docker image builds (linux/amd64)&#10;Push to GitHub Container Registry (ghcr.io)&#10;SSH-based deployment to cloud servers&#10;Health checks for backend and frontend&#10;Automatic changelog generation&#10;GitHub release creation with Docker image tags&#10;Rollback capability via workflow_dispatch&#10;model.yml - LFS Model Management:&#10;&#10;Upload models to GitHub Releases&#10;Download models from releases&#10;Model integrity verification with SHA256&#10;PyTorch model load testing&#10;Automatic Docker rebuild on model updates&#10;Proper LFS file handling throughout&#10;All workflows are optimized for Git LFS, include proper error handling, and support cloud deployment scenarios." />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/PacketInspectionTransformerV3$run.coverage" NAME="run Coverage Results" MODIFIED="1767938496545" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />

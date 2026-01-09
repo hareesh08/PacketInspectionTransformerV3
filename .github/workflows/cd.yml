@@ -159,43 +159,35 @@ jobs:
           scp deploy.tar.gz ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/tmp/
 
       - name: Deploy to server
-        env:
-          SERVER_USER: ${{ secrets.SERVER_USER }}
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          APP_DIR: ${{ secrets.APP_DIR || '/opt/packet-inspection' }}
-          REGISTRY: ${{ env.REGISTRY }}
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
         run: |
           ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'ENDSSH'
             set -e
             
+            APP_DIR="${{ secrets.APP_DIR }}"
+            if [ -z "$APP_DIR" ]; then
+              APP_DIR="/opt/packet-inspection"
+            fi
+            
             echo "=== Deployment Started ==="
             
-            # Create app directory if not exists
-            sudo mkdir -p ${{ secrets.APP_DIR }}
-            cd ${{ secrets.APP_DIR }}
+            sudo mkdir -p "$APP_DIR"
+            cd "$APP_DIR"
             
-            # Extract deployment package
             sudo tar xzf /tmp/deploy.tar.gz
             rm /tmp/deploy.tar.gz
             
-            # Login to GitHub Container Registry
-            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             
-            # Pull latest images
             echo "=== Pulling Docker images ==="
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:latest
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:latest
             
-            # Stop existing containers
             echo "=== Stopping existing containers ==="
             docker compose --profile prod down || true
             
-            # Start new containers
             echo "=== Starting new containers ==="
             docker compose --profile prod up -d
             
-            # Clean up old images
             echo "=== Cleaning up ==="
             docker image prune -f
             
@@ -313,14 +305,17 @@ jobs:
         if: inputs.docker_tag != 'latest'
         run: |
           ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'ENDSSH'
-            cd ${{ secrets.APP_DIR || '/opt/packet-inspection' }}
+            APP_DIR="${{ secrets.APP_DIR }}"
+            if [ -z "$APP_DIR" ]; then
+              APP_DIR="/opt/packet-inspection"
+            fi
+            
+            cd "$APP_DIR"
             
             echo "=== Rolling back to ${{ inputs.docker_tag }} ==="
             
-            # Update image tags in docker-compose.yml
             sed -i 's|:latest|:${{ inputs.docker_tag }}|g' docker-compose.yml
             
-            # Pull and restart
             docker compose --profile prod pull
             docker compose --profile prod up -d
             

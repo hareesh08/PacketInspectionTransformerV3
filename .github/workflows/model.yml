@@ -1,0 +1,136 @@
+name: Model Management
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_version:
+        description: 'Model version (e.g., v1.0.0)'
+        required: true
+        type: string
+      upload:
+        description: 'Upload model to GitHub Releases'
+        required: true
+        type: boolean
+        default: false
+
+env:
+  MODEL_PATH: model/finetuned_best_model.pth
+  MODEL_NAME: packet_inspection_model.pth
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Upload Model to GitHub Releases
+  # -------------------------------------------------------------------------
+  upload-model:
+    if: inputs.upload
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check model file exists
+        id: check_model
+        run: |
+          if [ -f "${{ env.MODEL_PATH }}" ]; then
+            echo "Model file found"
+            echo "size=$(ls -lh ${{ env.MODEL_PATH }} | awk '{print $5}')" >> $GITHUB_OUTPUT
+          else
+            echo "Model file not found!"
+            exit 1
+          fi
+
+      - name: Get model checksum
+        id: checksum
+        run: |
+          echo "sha256=$(sha256sum ${{ env.MODEL_PATH }} | awk '{print $1}')" >> $GITHUB_OUTPUT
+
+      - name: Create release asset info
+        run: |
+          echo "Model Version: ${{ inputs.model_version }}"
+          echo "Model Size: ${{ steps.check_model.outputs.size }}"
+          echo "SHA256: ${{ steps.checksum.outputs.sha256 }}"
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITH_TOKEN }}
+        with:
+          tag_name: model-${{ inputs.model_version }}
+          release_name: Model ${{ inputs.model_version }}
+          draft: false
+          prerelease: false
+          body: |
+            # Packet Inspection Transformer Model
+
+            ## Model Information
+            - **Version**: ${{ inputs.model_version }}
+            - **File**: ${{ env.MODEL_NAME }}
+            - **Size**: ${{ steps.check_model.outputs.size }}
+            - **SHA256**: ${{ steps.checksum.outputs.sha256 }}
+
+            ## Usage
+            Download the model file and place it in the `model/` directory.
+
+      - name: Upload Model Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITH_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.MODEL_PATH }}
+          asset_name: ${{ env.MODEL_NAME }}
+          asset_content_type: application/octet-stream
+
+  # -------------------------------------------------------------------------
+  # Download Model from GitHub Releases
+  # -------------------------------------------------------------------------
+  download-model:
+    runs-on: ubuntu-latest
+    outputs:
+      model_path: ${{ steps.download.outputs.model_path }}
+    steps:
+      - name: Get latest model release
+        id: latest_release
+        uses: actions/get-releases@v1
+        with:
+          filter: name
+          direction: desc
+          limit: 1
+          tag_name_pattern: ^model-
+
+      - name: Download model asset
+        id: download
+        if: steps.latest_release.outputs.count > 0
+        run: |
+          MODEL_URL="${{ steps.latest_release.outputs.assets[0].url }}"
+          MODEL_NAME="${{ steps.latest_release.outputs.assets[0].name }}"
+          
+          echo "Downloading model from: $MODEL_NAME"
+          curl -L -o "${{ env.MODEL_PATH }}" \
+            -H "Accept: application/octet-stream" \
+            "$MODEL_URL"
+          
+          echo "model_path=${{ env.MODEL_PATH }}" >> $GITHUB_OUTPUT
+          
+          # Verify checksum
+          echo "${{ steps.latest_release.outputs.body }}" | grep -oP 'SHA256: \K.*' | xargs -I {} echo {} > expected_checksum.txt
+          echo "$(sha256sum ${{ env.MODEL_PATH }} | awk '{print $1}')" > actual_checksum.txt
+          
+          if diff expected_checksum.txt actual_checksum.txt > /dev/null; then
+            echo "Model checksum verified!"
+          else
+            echo "Checksum mismatch!"
+            exit 1
+          fi
+
+      - name: Verify model file
+        if: steps.download.outputs.model_path
+        run: |
+          if [ -f "${{ env.MODEL_PATH }}" ]; then
+            echo "Model file downloaded successfully"
+            ls -lh "${{ env.MODEL_PATH }}"
+          else
+            echo "Model file not found after download"
+            exit 1
+          fi

@@ -11,6 +11,23 @@ A production-grade malware detection system that inspects network traffic and fi
 - **SQLite Logging**: Persistent threat logs with proper indexing
 - **FastAPI Endpoints**: RESTful API for scanning and management
 - **Configuration Management**: Pydantic settings with environment variable support
+- **Docker Support**: Multi-container deployment with CI/CD pipeline
+
+## ⚡ Quick Start (Docker)
+
+```bash
+# Clone and enter directory
+git clone https://github.com/hareesh08/PacketInspectionTransformerV3.git
+cd PacketInspectionTransformerV3
+
+# Build and start (production)
+make build
+make up
+
+# Access the application
+# Dashboard: http://localhost
+# API: http://localhost/api
+```
 
 ## 📁 Project Structure
 
@@ -38,7 +55,32 @@ PacketInspectionTransformerV2/
 └── README.md                       # This file
 ```
 
-## 🛠️ Installation
+## 🐳 Docker Deployment
+
+See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete deployment guide.
+
+### Quick Commands
+
+| Command | Description |
+|---------|-------------|
+| `make build` | Build production containers |
+| `make up` | Start production containers |
+| `make up-dev` | Start development with hot reload |
+| `make down` | Stop all containers |
+| `make logs` | View logs |
+| `make clean` | Clean up containers and images |
+
+### Manual Docker Commands
+
+```bash
+# Production
+docker compose --profile prod up -d
+
+# Development
+docker compose --profile dev up -d
+```
+
+## 🛠️ Installation (Non-Docker)
 
 ```bash
 # Clone or navigate to project directory

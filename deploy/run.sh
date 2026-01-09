@@ -78,8 +78,12 @@ start_uvicorn() {
         exit 1
     fi
     
-    # Activate virtual environment
-    source "$VENV_PATH/bin/activate"
+    # Check if uvicorn is available
+    UVICORN_PATH="$VENV_PATH/bin/uvicorn"
+    if [ ! -f "$UVICORN_PATH" ]; then
+        log_error "uvicorn not found in virtual environment. Run setup.sh to install dependencies!"
+        exit 1
+    fi
     
     # Check if port 8000 is already in use
     if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
@@ -88,29 +92,43 @@ start_uvicorn() {
         sleep 2
     fi
     
-    # Create nohup script
-    cat > /tmp/start_uvicorn.sh << 'SCRIPT'
+    # Create start script with proper background execution
+    cat > /tmp/start_uvicorn.sh << SCRIPT
 #!/bin/bash
+# Ensure process survives SSH disconnect
+trap '' HUP INT QUIT TSTP
+
 cd /opt/packet-inspection-transformer
-source /opt/packet-inspection-transformer/venv/bin/activate
-exec uvicorn app:app --host 0.0.0.0 --port 8000 >> /opt/packet-inspection-transformer/logs/uvicorn.log 2>&1
+
+# Use full path to uvicorn
+exec /opt/packet-inspection-transformer/venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000 >> /opt/packet-inspection-transformer/logs/uvicorn.log 2>&1 &
 SCRIPT
     
     chmod +x /tmp/start_uvicorn.sh
     
-    # Start in background
-    nohup /tmp/start_uvicorn.sh &
+    # Start in background with nohup, redirect output, and detach from terminal
+    cd /
+    nohup /tmp/start_uvicorn.sh > /dev/null 2>&1 &
     Uvicorn_PID=$!
     
-    echo "$Uvicorn_PID" > "$PID_FILE"
+    # Wait for process to start
+    sleep 2
     
-    log_success "Uvicorn started (PID: $Uvicorn_PID)"
-    
-    # Wait a bit and check if process is running
-    sleep 3
-    
+    # Verify process is running and not in a stopped state
     if kill -0 "$Uvicorn_PID" 2>/dev/null; then
-        log_success "Backend is running successfully"
+        # Disown the process to fully detach from shell
+        disown "$Uvicorn_PID"
+        echo "$Uvicorn_PID" > "$PID_FILE"
+        log_success "Uvicorn started (PID: $Uvicorn_PID)"
+        
+        # Wait a bit and verify it's still running
+        sleep 3
+        if kill -0 "$Uvicorn_PID" 2>/dev/null; then
+            log_success "Backend is running successfully (survives SSH disconnect)"
+        else
+            log_error "Backend failed to stay running. Check logs at $LOG_DIR/uvicorn.log"
+            exit 1
+        fi
     else
         log_error "Backend failed to start. Check logs at $LOG_DIR/uvicorn.log"
         exit 1

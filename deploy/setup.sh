@@ -42,29 +42,61 @@ update_system() {
     log_success "System updated"
 }
 
+# Remove existing Python and Node.js installations for clean install
+clean_existing_installations() {
+    log_info "Removing existing Python and Node.js installations..."
+    
+    # Stop and remove the application first
+    if [ -f "/etc/systemd/system/packet-inspection-transformer.service" ]; then
+        systemctl stop packet-inspection-transformer 2>/dev/null || true
+        systemctl disable packet-inspection-transformer 2>/dev/null || true
+    fi
+    
+    # Remove virtual environment
+    if [ -d "/opt/packet-inspection-transformer/venv" ]; then
+        rm -rf /opt/packet-inspection-transformer/venv
+        log_info "Virtual environment removed"
+    fi
+    
+    # Remove Python packages
+    apt-get remove -y --purge python3 python3-venv python3-pip python3-wheel 2>/dev/null || true
+    
+    # Remove Node.js packages
+    apt-get remove -y --purge nodejs 2>/dev/null || true
+    
+    # Remove NodeSource repository files
+    rm -f /etc/apt/sources.list.d/nodesource.list 2>/dev/null || true
+    
+    # Clean up
+    apt-get autoremove -y -qq 2>/dev/null || true
+    apt-get autoclean -qq 2>/dev/null || true
+    
+    log_success "Existing installations removed (including virtual environment)"
+}
+
 # Install Python and dependencies
 install_python() {
     log_info "Installing Python 3 and dependencies..."
     apt-get install -y -qq python3 python3-venv python3-pip curl wget git
     log_success "Python 3 installed"
+    
+    # Verify installation
+    python3 --version
+    pip3 --version
 }
 
 # Install Node.js 20.x
 install_nodejs() {
     log_info "Installing Node.js 20.x..."
     
-    # Check if Node.js is already installed
-    if command -v node &> /dev/null; then
-        NODE_VERSION=$(node --version)
-        log_warn "Node.js already installed: $NODE_VERSION"
-    else
-        # Install NodeSource repository
-        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -E -
-        apt-get install -y -qq nodejs
-        log_success "Node.js 20.x installed"
-    fi
+    # Install NodeSource repository
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -E -
+    
+    # Install Node.js (this will be a fresh install after cleanup)
+    apt-get install -y -qq nodejs
     
     # Verify installation
+    log_success "Node.js 20.x installed"
     node --version
     npm --version
 }
@@ -288,25 +320,24 @@ setup_venv() {
     VENV_PATH="/opt/packet-inspection-transformer/venv"
     
     if [ -d "$VENV_PATH" ]; then
-        log_warn "Virtual environment already exists, skipping creation"
+        log_success "Virtual environment already exists at $VENV_PATH"
     else
         python3 -m venv "$VENV_PATH"
         log_success "Virtual environment created at $VENV_PATH"
     fi
     
-    # Activate venv and install dependencies
-    log_info "Installing Python dependencies..."
+    # Always ensure dependencies are installed
     source "$VENV_PATH/bin/activate"
     
-    # Upgrade pip
-    pip install --upgrade pip -q
-    
-    # Install requirements
     if [ -f "requirements.txt" ]; then
+        # Install dependencies (pip will skip already-installed packages)
+        log_info "Installing/upgrading Python dependencies..."
+        pip install --upgrade pip -q
         pip install -r requirements.txt -q
-        log_success "Python dependencies installed"
+        log_success "Python dependencies installed/verified"
     else
-        log_warn "requirements.txt not found, skipping Python dependencies"
+        log_warn "requirements.txt not found, installing core dependencies..."
+        pip install fastapi uvicorn python-multipart -q
     fi
     
     deactivate
@@ -323,11 +354,22 @@ build_frontend() {
         return
     fi
     
+    # Check if frontend is already built
+    if [ -d "$FRONTEND_PATH/dist" ]; then
+        log_success "Frontend build already exists at $FRONTEND_PATH/dist (skipping build)"
+        return
+    fi
+    
     cd Frontend
     
-    # Install dependencies
-    log_info "Installing frontend dependencies..."
-    npm ci --quiet 2>/dev/null || npm install --quiet
+    # Check if node_modules exists (dependencies installed)
+    if [ -d "node_modules" ]; then
+        log_info "Frontend dependencies already installed (skipping npm install)"
+    else
+        # Install dependencies
+        log_info "Installing frontend dependencies..."
+        npm ci --quiet 2>/dev/null || npm install --quiet
+    fi
     
     # Build
     log_info "Building frontend production bundle..."
@@ -516,6 +558,7 @@ main() {
     
     check_root
     update_system
+    clean_existing_installations
     install_python
     install_nodejs
     install_nginx

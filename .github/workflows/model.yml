@@ -28,10 +28,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download model from HuggingFace or external source
-        id: download-external
-        if: '! -f "${{ env.MODEL_PATH }}"'
+      - name: Check model file
+        id: check-local-model
         run: |
+          # Check if model file exists locally
+          if [ -f "${{ env.MODEL_PATH }}" ]; then
+            echo "Model file found locally"
+            echo "local_model_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Model not found locally"
+            echo "local_model_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download model from external source
+        id: download-external
+        if: "!steps.check-local-model.outputs.local_model_exists"
+        run: |
+          echo "Model not found locally, checking for external source..."
+          
           echo "Model not found locally, checking for external source..."
           # Check if there's a model URL provided or use a default
           MODEL_URL="${MODEL_DOWNLOAD_URL:-}"

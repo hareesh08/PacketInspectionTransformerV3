@@ -98,6 +98,10 @@ build_frontend() {
     fi
     
     cd Frontend
+    
+    # Clear vite cache to fix stale imports
+    rm -rf node_modules/.vite 2>/dev/null || true
+    
     npm ci --quiet 2>/dev/null || npm install --quiet
     npm run build
     

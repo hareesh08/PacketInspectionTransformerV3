@@ -105,8 +105,10 @@ build_frontend() {
     npm ci --quiet 2>/dev/null || npm install --quiet
     npm run build
     
+    # Clean and rebuild dashboard directory
+    rm -rf ../dashboard/dist
     mkdir -p ../dashboard/dist
-    mv dist/* ../dashboard/dist/
+    cp -r dist/* ../dashboard/dist/
     cd ..
     
     log_success "Frontend built"

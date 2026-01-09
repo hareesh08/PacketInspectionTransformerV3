@@ -193,6 +193,49 @@ curl http://localhost:8000/health
 sudo docker inspect packet-inspection-backend
 ```
 
+### Frontend shows "Failed to connect to backend"
+
+This usually happens when the frontend API URL is pointing to localhost instead of the server IP.
+
+**Check and fix the API URL:**
+
+1. Edit `Frontend/.env`:
+```bash
+# Change from:
+VITE_API_URL=http://localhost:8000
+# To:
+VITE_API_URL=http://157.245.97.220
+```
+
+2. Commit and push the change:
+```bash
+git add Frontend/.env
+git commit -m "Fix API URL for production"
+git push
+```
+
+3. On the server, pull and rebuild:
+```bash
+cd ~/PacketInspectionTransformerV3
+git pull
+sudo ./deploy/docker-deploy.sh build
+sudo ./deploy/docker-deploy.sh down
+sudo ./deploy/docker-deploy.sh up
+```
+
+### Port 80 already in use
+
+If nginx fails to start due to port conflict:
+
+```bash
+# Stop host nginx
+sudo systemctl stop nginx
+
+# Restart containers
+sudo ./deploy/docker-deploy.sh down
+sudo ./deploy/docker-deploy.sh up
+```
+
 ## Update Deployment
 
 ```bash

@@ -5,11 +5,50 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="8841923a-3a8c-410b-8e39-f8f2178fb268" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/PacketInspectionTransformerV3.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/dataSources.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/dataSources/4fbb769a-6874-42b4-9669-cdd20e7bb3d7.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/dataSources/4fbb769a-6874-42b4-9669-cdd20e7bb3d7/storage_v2/_src_/schema/main.uQUzAA.meta" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Frontend/src/components/dashboard/ModelInfo.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Frontend/src/hooks/useLogs.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Frontend/src/hooks/useNotifications.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Frontend/src/pages/About.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/deploy/clean.sh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/deploy/menu.sh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/deploy/restart.sh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/deploy/run.sh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/deploy/setup-ssl.sh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/deploy/setup.sh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/vmsetup.md" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/model/finetuned_best_model.pth" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/PacketInspectionTransformerV3.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/PacketInspectionTransformerV3.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/2.1.0" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Frontend/src/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/src/App.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Frontend/src/components/dashboard/RecentThreats.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/src/components/dashboard/RecentThreats.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Frontend/src/components/layout/Header.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/src/components/layout/Header.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Frontend/src/components/layout/Sidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/src/components/layout/Sidebar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Frontend/src/components/scanner/FileUploader.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/src/components/scanner/FileUploader.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Frontend/src/components/scanner/UrlScanner.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/src/components/scanner/UrlScanner.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Frontend/src/components/ui/toast.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/src/components/ui/toast.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Frontend/src/index.css" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/src/index.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Frontend/src/lib/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/src/lib/api.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Frontend/src/lib/utils.ts" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/src/lib/utils.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Frontend/src/pages/Dashboard.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/src/pages/Dashboard.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Frontend/src/pages/Scanner.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/src/pages/Scanner.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Frontend/src/types/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/src/types/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Frontend/tailwind.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/tailwind.config.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/detector.py" beforeDir="false" afterPath="$PROJECT_DIR$/detector.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/logs/threats_20260109.log" beforeDir="false" afterPath="$PROJECT_DIR$/logs/threats_20260109.log" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lovable-project-0d2c00d6-c79c-438f-8848-eb9e5cc94cf9-2026-01-09.zip" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/settings.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/threats.db" beforeDir="false" afterPath="$PROJECT_DIR$/threats.db" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -30,6 +69,18 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {
+    "state": "OPEN",
+    "assignee": "hareesh08"
+  }
+}]]></component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/hareesh08/PacketInspectionTransformerV3.git",
+    "accountId": "f05c7dc7-7dc0-43c4-84fe-0bafbe574196"
+  }
+}]]></component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 7
 }</component>
@@ -38,25 +89,26 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;Python.ModelLoader.executor&quot;: &quot;Run&quot;,
-    &quot;Python.app.executor&quot;: &quot;Run&quot;,
-    &quot;Python.run.executor&quot;: &quot;Run&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
-    &quot;ts.external.directory.path&quot;: &quot;D:\\Python-25\\PacketInspectionTransformerV3\\Frontend\\node_modules\\typescript\\lib&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "Python.ModelLoader.executor": "Run",
+    "Python.app.executor": "Run",
+    "Python.run.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "git-widget-placeholder": "master",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "ts.external.directory.path": "D:\\Python-25\\PacketInspectionTransformerV3\\Frontend\\node_modules\\typescript\\lib",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
+}]]></component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
@@ -81,7 +133,7 @@
       <workItem from="1767942728803" duration="901000" />
       <workItem from="1767943702140" duration="1085000" />
       <workItem from="1767945098859" duration="3270000" />
-      <workItem from="1767948834710" duration="901000" />
+      <workItem from="1767948834710" duration="7598000" />
     </task>
     <servers />
   </component>

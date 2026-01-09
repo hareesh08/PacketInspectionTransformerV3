@@ -1,19 +1,21 @@
 import { useState } from 'react';
-import { Globe, Scan, AlertCircle, Loader2 } from 'lucide-react';
+import { Globe, Scan, AlertCircle, Loader2, Zap, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
 interface UrlScannerProps {
-  onScan: (url: string, blockOnDetection: boolean) => Promise<void>;
+  onScan: (url: string, blockOnDetection: boolean, earlyTermination: boolean) => Promise<void>;
   isScanning: boolean;
 }
 
 export function UrlScanner({ onScan, isScanning }: UrlScannerProps) {
   const [url, setUrl] = useState('');
   const [blockOnDetection, setBlockOnDetection] = useState(true);
+  const [earlyTermination, setEarlyTermination] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,7 +35,7 @@ export function UrlScanner({ onScan, isScanning }: UrlScannerProps) {
     }
 
     try {
-      await onScan(url, blockOnDetection);
+      await onScan(url, blockOnDetection, earlyTermination);
       setUrl('');
     } catch (err) {
       setError('Failed to scan URL. Please try again.');
@@ -82,19 +84,48 @@ export function UrlScanner({ onScan, isScanning }: UrlScannerProps) {
           )}
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center justify-between rounded-lg bg-secondary/50 p-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10">
+              <Shield className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <Label htmlFor="block" className="text-sm font-medium cursor-pointer">
+                Auto-block threats
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Block access when malware detected
+              </p>
+            </div>
+          </div>
           <Checkbox
             id="block"
             checked={blockOnDetection}
             onCheckedChange={(checked) => setBlockOnDetection(checked as boolean)}
             disabled={isScanning}
           />
-          <Label
-            htmlFor="block"
-            className="text-sm text-muted-foreground cursor-pointer"
-          >
-            Automatically block if threat detected
-          </Label>
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg bg-secondary/50 p-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-risk-high/10">
+              <Zap className="h-4 w-4 text-risk-high" />
+            </div>
+            <div>
+              <Label htmlFor="early-termination" className="text-sm font-medium cursor-pointer">
+                Fast Block Mode
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Stop at 1KB for high-confidence threats
+              </p>
+            </div>
+          </div>
+          <Switch
+            id="early-termination"
+            checked={earlyTermination}
+            onCheckedChange={setEarlyTermination}
+            disabled={isScanning}
+          />
         </div>
 
         <Button

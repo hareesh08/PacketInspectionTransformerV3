@@ -4,8 +4,11 @@ Handles real-time malware detection with streaming byte-level analysis.
 """
 
 import os
+import sys
 import time
 import logging
+import asyncio
+from datetime import datetime
 from typing import Optional, Dict, Any, List, Tuple, Callable
 from dataclasses import dataclass
 import threading
@@ -17,9 +20,11 @@ import numpy as np
 import requests
 from io import BytesIO
 
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from settings import settings
 from models import RiskLevel, SourceType, ScanStatus
-from threat_manager import get_threat_manager, log_detection
 
 logger = logging.getLogger(__name__)
 
@@ -184,7 +189,19 @@ class StreamingDetector:
             model_path: Path to pretrained model checkpoint
         """
         self.model_path = model_path or settings.model_path
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        # Force GPU if available and settings allow
+        if torch.cuda.is_available():
+            if settings.force_gpu:
+                self.device = torch.device('cuda')
+                torch.cuda.set_device(settings.gpu_device_id)
+                logger.info(f"Using GPU: {torch.cuda.get_device_name(0)}")
+            else:
+                self.device = torch.device('cpu')
+                logger.info("GPU available but force_gpu is disabled, using CPU")
+        else:
+            self.device = torch.device('cpu')
+            logger.info("No GPU available, using CPU")
         
         # Streaming parameters
         self.chunk_size = settings.chunk_size
@@ -193,6 +210,11 @@ class StreamingDetector:
         self.download_timeout = settings.download_timeout
         self.temperature = settings.temperature
         self.confidence_threshold = settings.confidence_threshold
+        
+        # Early termination parameters (fast block mode)
+        self.early_termination_enabled = settings.early_termination_enabled
+        self.early_termination_threshold = settings.early_termination_threshold
+        self.early_termination_min_bytes = settings.early_termination_min_bytes
         
         # Model
         self.model: Optional[PacketTransformer] = None
@@ -370,7 +392,8 @@ class StreamingDetector:
         self,
         url: str,
         block_on_detection: bool = True,
-        progress_callback: Optional[Callable[[int, float], None]] = None
+        progress_callback: Optional[Callable[[int, float], None]] = None,
+        early_termination: Optional[bool] = None
     ) -> ScanResult:
         """
         Stream-download URL and detect malware mid-download.
@@ -379,16 +402,24 @@ class StreamingDetector:
             url: URL to scan
             block_on_detection: Block if threat detected
             progress_callback: Optional callback(bytes_scanned, probability)
+            early_termination: Override early termination setting (None = use default)
             
         Returns:
             ScanResult with detection details
         """
+        # Use parameter override or default from settings
+        use_early_termination = (
+            early_termination if early_termination is not None
+            else self.early_termination_enabled
+        )
+        
         start_time = time.perf_counter()
         buffer = bytearray()
         bytes_scanned = 0
         max_probability = 0.0
+        early_termination_active = False
         
-        logger.info(f"Starting URL scan: {url}")
+        logger.info(f"Starting URL scan: {url} (early_termination={use_early_termination})")
         
         try:
             with requests.get(
@@ -421,7 +452,21 @@ class StreamingDetector:
                     if progress_callback:
                         progress_callback(bytes_scanned, probability)
                     
-                    # Early termination
+                    # Early termination check (fast block mode)
+                    if use_early_termination and bytes_scanned >= self.early_termination_min_bytes:
+                        if probability >= self.early_termination_threshold:
+                            logger.warning(
+                                f"EARLY TERMINATION: Threat detected at {bytes_scanned} bytes "
+                                f"(confidence: {probability:.4f})"
+                            )
+                            early_termination_active = True
+                            scan_time_ms = (time.perf_counter() - start_time) * 1000
+                            return self._create_blocked_result(
+                                url, "URL", probability, bytes_scanned, scan_time_ms,
+                                details={"early_termination": True}
+                            )
+                    
+                    # Standard threshold check
                     if probability >= self.confidence_threshold:
                         logger.warning(f"Threat detected mid-download: {probability:.4f}")
                         
@@ -434,7 +479,8 @@ class StreamingDetector:
                 # Clean scan
                 scan_time_ms = (time.perf_counter() - start_time) * 1000
                 return self._create_clean_result(
-                    url, "URL", max_probability, bytes_scanned, scan_time_ms
+                    url, "URL", max_probability, bytes_scanned, scan_time_ms,
+                    details={"early_termination_attempted": early_termination_active}
                 )
                 
         except requests.RequestException as e:
@@ -456,7 +502,8 @@ class StreamingDetector:
         self,
         file_data: bytes,
         filename: str = "uploaded_file",
-        block_on_detection: bool = True
+        block_on_detection: bool = True,
+        early_termination: Optional[bool] = None
     ) -> ScanResult:
         """
         Scan file data in streaming mode.
@@ -465,16 +512,24 @@ class StreamingDetector:
             file_data: Raw file bytes
             filename: Original filename
             block_on_detection: Block if threat detected
+            early_termination: Override early termination setting (None = use default)
             
         Returns:
             ScanResult with detection details
         """
+        # Use parameter override or default from settings
+        use_early_termination = (
+            early_termination if early_termination is not None
+            else self.early_termination_enabled
+        )
+        
         start_time = time.perf_counter()
         buffer = bytearray()
         bytes_scanned = 0
         max_probability = 0.0
+        early_termination_active = False
         
-        logger.info(f"Starting file scan: {filename} ({len(file_data)} bytes)")
+        logger.info(f"Starting file scan: {filename} ({len(file_data)} bytes) (early_termination={use_early_termination})")
         
         # Process in chunks
         for i in range(0, len(file_data), self.chunk_size):
@@ -489,7 +544,21 @@ class StreamingDetector:
             probability = self.infer(bytes(buffer))
             max_probability = max(max_probability, probability)
             
-            # Early termination
+            # Early termination check (fast block mode)
+            if use_early_termination and bytes_scanned >= self.early_termination_min_bytes:
+                if probability >= self.early_termination_threshold:
+                    logger.warning(
+                        f"EARLY TERMINATION: Threat detected at {bytes_scanned} bytes "
+                        f"(confidence: {probability:.4f})"
+                    )
+                    early_termination_active = True
+                    scan_time_ms = (time.perf_counter() - start_time) * 1000
+                    return self._create_blocked_result(
+                        filename, "FILE", probability, bytes_scanned, scan_time_ms,
+                        details={"early_termination": True}
+                    )
+            
+            # Standard threshold check
             if probability >= self.confidence_threshold:
                 logger.warning(f"Threat detected in file: {probability:.4f}")
                 
@@ -501,8 +570,17 @@ class StreamingDetector:
         # Clean scan
         scan_time_ms = (time.perf_counter() - start_time) * 1000
         return self._create_clean_result(
-            filename, "FILE", max_probability, bytes_scanned, scan_time_ms
+            filename, "FILE", max_probability, bytes_scanned, scan_time_ms,
+            details={"early_termination_attempted": early_termination_active}
         )
+    
+    async def _send_notification(self, event_type: str, data: dict):
+        """Send notification to connected clients via SSE."""
+        try:
+            from app import notify_clients
+            await notify_clients(event_type, data)
+        except Exception:
+            pass  # Notification system may not be initialized
     
     def _create_blocked_result(
         self,
@@ -510,7 +588,8 @@ class StreamingDetector:
         source_type: str,
         probability: float,
         bytes_scanned: int,
-        scan_time_ms: float
+        scan_time_ms: float,
+        details: Optional[Dict[str, Any]] = None
     ) -> ScanResult:
         """Create a blocked scan result."""
         risk_level = settings.get_risk_level(probability)
@@ -520,8 +599,12 @@ class StreamingDetector:
             self.stats["threats_blocked"] += 1
             self.stats["total_bytes_scanned"] += bytes_scanned
         
+        # Import here to avoid circular imports
+        from threat_manager import get_threat_manager
+        threat_manager = get_threat_manager()
+        
         # Log to threat manager
-        result = log_detection(
+        result = threat_manager.log_threat(
             source=source,
             source_type=source_type,
             probability=probability,
@@ -529,6 +612,30 @@ class StreamingDetector:
             scan_time_ms=scan_time_ms,
             blocked=True
         )
+        
+        # Create notification data
+        notification_data = {
+            "source": source,
+            "source_type": source_type,
+            "probability": probability,
+            "risk_level": risk_level,
+            "bytes_scanned": bytes_scanned,
+            "scan_time_ms": scan_time_ms,
+            "timestamp": datetime.utcnow().isoformat() if hasattr(datetime, 'utcnow') else time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        }
+        
+        # Schedule notification (will be executed if async context is available)
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(self._send_notification("threat_detected", notification_data))
+        except RuntimeError:
+            pass  # No event loop
+        
+        # Merge details
+        result_details = {"log_id": result.get("threat_id")}
+        if details:
+            result_details.update(details)
         
         return ScanResult(
             source=source,
@@ -539,7 +646,7 @@ class StreamingDetector:
             blocked=True,
             scan_time_ms=scan_time_ms,
             status="THREAT_DETECTED",
-            details={"log_id": result.get("threat_id")}
+            details=result_details
         )
     
     def _create_clean_result(
@@ -548,7 +655,8 @@ class StreamingDetector:
         source_type: str,
         probability: float,
         bytes_scanned: int,
-        scan_time_ms: float
+        scan_time_ms: float,
+        details: Optional[Dict[str, Any]] = None
     ) -> ScanResult:
         """Create a clean scan result."""
         risk_level = settings.get_risk_level(probability)
@@ -557,15 +665,23 @@ class StreamingDetector:
             self.stats["total_scans"] += 1
             self.stats["total_bytes_scanned"] += bytes_scanned
         
+        # Import here to avoid circular imports
+        from threat_manager import get_threat_manager
+        threat_manager = get_threat_manager()
+        
         # Log to threat manager
-        result = log_detection(
+        result = threat_manager.log_clean(
             source=source,
             source_type=source_type,
             probability=probability,
             bytes_scanned=bytes_scanned,
-            scan_time_ms=scan_time_ms,
-            blocked=False
+            scan_time_ms=scan_time_ms
         )
+        
+        # Merge details
+        result_details = {"log_id": result.get("threat_id")}
+        if details:
+            result_details.update(details)
         
         return ScanResult(
             source=source,
@@ -576,7 +692,7 @@ class StreamingDetector:
             blocked=False,
             scan_time_ms=scan_time_ms,
             status="CLEAN",
-            details={"log_id": result.get("threat_id")}
+            details=result_details
         )
     
     def set_threshold(self, threshold: float) -> None:

@@ -127,3 +127,107 @@ export interface ThresholdResponse {
   new_threshold: number;
   status: string;
 }
+
+// =====================================================================
+// Model Info & Resource Monitoring Types
+// =====================================================================
+
+export interface GPUInfo {
+  available: boolean;
+  device_name: string | null;
+  device_index: number;
+  total_memory_gb: number | null;
+  allocated_memory_gb: number | null;
+  cached_memory_gb: number | null;
+  compute_capability: string | null;
+}
+
+export interface CPUInfo {
+  logical_cores: number;
+  physical_cores: number;
+  frequency_mhz: number | null;
+  cpu_percent: number;
+}
+
+export interface MemoryInfo {
+  total_gb: number;
+  available_gb: number;
+  used_gb: number;
+  percent_used: number;
+  swap_total_gb: number;
+  swap_used_gb: number;
+}
+
+export interface ModelInfo {
+  loaded: boolean;
+  model_path: string;
+  total_parameters: number;
+  trainable_parameters: number;
+  vocab_size: number;
+  d_model: number;
+  nhead: number;
+  num_layers: number;
+  dim_feedforward: number;
+  dropout: number;
+}
+
+export interface ModelInfoResponse {
+  device: string;
+  device_type: 'GPU' | 'CPU';
+  cpu: CPUInfo;
+  memory: MemoryInfo;
+  gpu: GPUInfo;
+  model: ModelInfo;
+  uptime_seconds: number;
+  timestamp: string;
+}
+
+// =====================================================================
+// Notification Types
+// =====================================================================
+
+export interface Notification {
+  id?: string;
+  event: string;
+  title?: string;
+  message?: string;
+  timestamp: string;
+  data: {
+    source?: string;
+    source_type?: string;
+    probability?: number;
+    risk_level?: string;
+    bytes_scanned?: number;
+    scan_time_ms?: number;
+    timestamp?: string;
+    message?: string;
+    [key: string]: unknown;
+  };
+}
+
+export type NotificationEvent =
+  | 'threat_detected'
+  | 'scan_completed'
+  | 'model_status'
+  | 'system_alert'
+  | 'heartbeat'
+  | 'test';
+
+// =====================================================================
+// Log Types
+// =====================================================================
+
+export interface LogEntry {
+  timestamp: string;
+  level: string;
+  message: string;
+  source: 'backend' | 'frontend';
+}
+
+export type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
+
+export interface LogFilter {
+  level?: LogLevel;
+  source?: 'backend' | 'frontend' | 'all';
+  search?: string;
+}

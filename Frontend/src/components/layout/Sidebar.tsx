@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Shield, LayoutDashboard, Scan, AlertTriangle, Settings, Activity } from 'lucide-react';
+import { Shield, LayoutDashboard, Scan, AlertTriangle, Settings, Activity, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navigation = [
@@ -7,6 +7,7 @@ const navigation = [
   { name: 'Scanner', href: '/scanner', icon: Scan },
   { name: 'Threats', href: '/threats', icon: AlertTriangle },
   { name: 'Settings', href: '/settings', icon: Settings },
+  { name: 'About', href: '/about', icon: Info },
 ];
 
 export function Sidebar() {

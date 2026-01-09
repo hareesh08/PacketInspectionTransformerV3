@@ -22,6 +22,19 @@ class Settings(BaseSettings):
     )
     
     # =====================================================================
+    # Compute Settings
+    # =====================================================================
+    force_gpu: bool = Field(
+        default=True,
+        description="Force GPU usage if available (CUDA)"
+    )
+    gpu_device_id: int = Field(
+        default=0,
+        ge=0,
+        description="GPU device ID to use"
+    )
+    
+    # =====================================================================
     # Detection Thresholds
     # =====================================================================
     confidence_threshold: float = Field(
@@ -199,6 +212,26 @@ class Settings(BaseSettings):
         ge=1,
         le=100,
         description="Maximum concurrent scan operations"
+    )
+    
+    # =====================================================================
+    # Early Termination Settings (Security Features)
+    # =====================================================================
+    early_termination_enabled: bool = Field(
+        default=False,
+        description="Enable early termination - stop scanning when threat detected"
+    )
+    early_termination_threshold: float = Field(
+        default=0.95,
+        ge=0.0,
+        le=1.0,
+        description="Probability threshold for early termination (blocks immediately at this confidence)"
+    )
+    early_termination_min_bytes: int = Field(
+        default=1024,
+        ge=64,
+        le=4096,
+        description="Minimum bytes to scan before allowing early termination"
     )
     
     # =====================================================================

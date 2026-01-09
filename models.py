@@ -80,6 +80,25 @@ class FileScanRequest(BaseModel):
     )
 
 
+class EarlyTerminationSettings(BaseModel):
+    """Settings for early termination (fast block) mode."""
+    enabled: bool = Field(
+        default=False,
+        description="Enable early termination - stop scanning when high confidence threat detected"
+    )
+    threshold: float = Field(
+        default=0.95,
+        ge=0.0,
+        le=1.0,
+        description="Probability threshold for early termination (blocks immediately at this confidence)"
+    )
+    min_bytes: int = Field(
+        default=1024,
+        ge=64,
+        description="Minimum bytes to scan before allowing early termination"
+    )
+
+
 class ThresholdUpdateRequest(BaseModel):
     """Request model for updating detection threshold."""
     threshold: float = Field(

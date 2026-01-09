@@ -18,7 +18,7 @@ export default function Scanner() {
   const [currentResult, setCurrentResult] = useState<ScanResult | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanResult[]>([]);
 
-  const handleUrlScan = useCallback(async (url: string, blockOnDetection: boolean) => {
+  const handleUrlScan = useCallback(async (url: string, blockOnDetection: boolean, earlyTermination: boolean) => {
     setIsScanning(true);
     setCurrentResult(null);
 
@@ -27,7 +27,7 @@ export default function Scanner() {
         description: url,
       });
 
-      const result = await api.scanUrl(url, blockOnDetection);
+      const result = await api.scanUrl(url, blockOnDetection, earlyTermination);
       
       setCurrentResult(result);
       setScanHistory((prev) => [result, ...prev.slice(0, 49)]);
@@ -62,7 +62,7 @@ export default function Scanner() {
     }
   }, []);
 
-  const handleFileUpload = useCallback(async (file: File, blockOnDetection: boolean) => {
+  const handleFileUpload = useCallback(async (file: File, blockOnDetection: boolean, earlyTermination: boolean) => {
     setIsScanning(true);
     setCurrentResult(null);
 
@@ -71,7 +71,7 @@ export default function Scanner() {
         description: file.name,
       });
 
-      const result = await api.scanFile(file, blockOnDetection);
+      const result = await api.scanFile(file, blockOnDetection, earlyTermination);
       
       setCurrentResult(result);
       setScanHistory((prev) => [result, ...prev.slice(0, 49)]);

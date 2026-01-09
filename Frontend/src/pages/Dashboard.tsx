@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Scan, AlertTriangle, Shield, HardDrive, RefreshCw } from 'lucide-react';
+import { Scan, AlertTriangle, Shield, HardDrive, RefreshCw, Bell } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { ThreatChart } from '@/components/dashboard/ThreatChart';
 import { SystemHealth } from '@/components/dashboard/SystemHealth';
 import { RecentThreats } from '@/components/dashboard/RecentThreats';
+import { ModelInfo } from '@/components/dashboard/ModelInfo';
 import { formatBytes } from '@/lib/formatters';
 import { api, ApiError } from '@/lib/api';
+import { useNotifications } from '@/hooks/useNotifications';
 import {
   ThreatStats,
   RiskDistribution,
@@ -64,6 +66,18 @@ export default function Dashboard() {
     }
   }, []);
 
+  // Setup notifications
+  const { isConnected, sendTestNotification, notifications } = useNotifications({
+    onThreatDetected: (notification) => {
+      toast.error('🚨 Threat Detected!', {
+        description: `Source: ${notification.data.source || 'Unknown'} | Risk: ${notification.data.risk_level || 'Unknown'}`,
+        duration: 10000,
+      });
+      // Refresh dashboard data when threat is detected
+      fetchDashboardData();
+    },
+  });
+
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
@@ -71,6 +85,13 @@ export default function Dashboard() {
   const handleRefresh = () => {
     fetchDashboardData();
     toast.info('Refreshing dashboard data...');
+  };
+
+  const handleTestNotification = async () => {
+    const success = await sendTestNotification();
+    if (!success) {
+      toast.error('Failed to send test notification');
+    }
   };
 
   // Show loading state while data is being fetched
@@ -109,8 +130,17 @@ export default function Dashboard() {
       title="Dashboard"
       subtitle="Real-time malware detection overview"
     >
-      {/* Refresh button */}
-      <div className="flex justify-end mb-4">
+      {/* Refresh button and notifications */}
+      <div className="flex justify-end mb-4 gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleTestNotification}
+          className="gap-2"
+        >
+          <Bell className="h-4 w-4" />
+          Test Notification
+        </Button>
         <Button
           variant="outline"
           size="sm"
@@ -168,8 +198,13 @@ export default function Dashboard() {
         <SystemHealth health={health} />
       </div>
 
+      {/* Model Info */}
+      <div className="mb-6">
+        <ModelInfo />
+      </div>
+
       {/* Recent Threats */}
-      <RecentThreats threats={recentThreats} />
+      <RecentThreats threats={recentThreats} distribution={distribution} />
     </MainLayout>
   );
 }

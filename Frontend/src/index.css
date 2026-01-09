@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,9 +7,7 @@
 /* Cybersecurity Dashboard Design System
    Tactical, dark theme with electric accents
    All colors in HSL for proper theming
-*/
-
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
+ */
 
 @layer base {
   :root {
@@ -38,6 +38,9 @@
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
+
+    --warning: 48 96% 53%;
+    --warning-foreground: 222 47% 11%;
 
     --border: 215 28% 18%;
     --input: 215 28% 18%;

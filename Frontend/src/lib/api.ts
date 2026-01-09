@@ -4,16 +4,13 @@
  */
 
 import axios, { AxiosError, AxiosInstance, AxiosResponse } from 'axios';
-
-// =====================================================================
-// Configuration
-// =====================================================================
+import { ModelInfoResponse, Notification, LogEntry } from '@/types';
 
 // API Base URL - configurable via environment variable
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-// Request timeout in milliseconds
-const REQUEST_TIMEOUT = 30000;
+// Request timeout in milliseconds (increased for large file scans)
+const REQUEST_TIMEOUT = 300000; // 5 minutes
 
 // =====================================================================
 // Type Definitions (matching backend models)
@@ -27,6 +24,12 @@ export interface URLScanRequest {
 
 export interface ThresholdUpdateRequest {
   threshold: number;
+}
+
+export interface EarlyTerminationSettings {
+  enabled: boolean;
+  threshold: number;
+  min_bytes: number;
 }
 
 export interface ThreatListParams {
@@ -145,11 +148,16 @@ class ApiClient {
    */
   async scanUrl(
     url: string,
-    blockOnDetection: boolean = true
+    blockOnDetection: boolean = true,
+    earlyTermination: boolean = false
   ): Promise<import('@/types').ScanResult> {
     const response = await this.client.post('/scan/url', {
       url,
       block_on_detection: blockOnDetection,
+    }, {
+      params: {
+        early_termination: earlyTermination,
+      },
     });
     return response.data;
   }
@@ -159,7 +167,8 @@ class ApiClient {
    */
   async scanFile(
     file: File,
-    blockOnDetection: boolean = true
+    blockOnDetection: boolean = true,
+    earlyTermination: boolean = false
   ): Promise<import('@/types').ScanResult> {
     const formData = new FormData();
     formData.append('file', file);
@@ -171,9 +180,36 @@ class ApiClient {
       },
       params: {
         block_on_detection: blockOnDetection,
+        early_termination: earlyTermination,
       },
     });
 
+    return response.data;
+  }
+
+  // =====================================================================
+  // Early Termination Settings Endpoints
+  // =====================================================================
+
+  /**
+   * Get early termination settings
+   */
+  async getEarlyTerminationSettings(): Promise<EarlyTerminationSettings> {
+    const response = await this.client.get('/settings/early-termination');
+    return response.data;
+  }
+
+  /**
+   * Update early termination settings
+   */
+  async updateEarlyTerminationSettings(
+    settings: EarlyTerminationSettings
+  ): Promise<{
+    old_settings: EarlyTerminationSettings;
+    new_settings: EarlyTerminationSettings;
+    status: string;
+  }> {
+    const response = await this.client.post('/settings/early-termination', settings);
     return response.data;
   }
 
@@ -224,6 +260,113 @@ class ApiClient {
     const response = await this.client.get('/stats');
     return response.data;
   }
+
+  // =====================================================================
+  // Model Info & Resource Monitoring Endpoints
+  // =====================================================================
+
+  /**
+   * Get detailed model information including device, cores, and memory
+   */
+  async getModelInfo(): Promise<ModelInfoResponse> {
+    const response = await this.client.get('/model-info');
+    return response.data;
+  }
+
+  /**
+   * Send a test notification
+   */
+  async sendTestNotification(): Promise<{ status: string }> {
+    const response = await this.client.post('/notifications/test');
+    return response.data;
+  }
+
+  // =====================================================================
+  // Server-Sent Events (SSE) for Notifications
+  // =====================================================================
+
+  /**
+   * Connect to the notifications stream
+   */
+  connectNotifications(
+    onMessage: (notification: Notification) => void,
+    onError?: (error: Event) => void
+  ): EventSource {
+    const eventSource = new EventSource(`${API_BASE_URL}/notifications/stream`);
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onMessage(data as Notification);
+      } catch {
+        onMessage({
+          event: event.type,
+          data: JSON.parse(event.data || '{}'),
+        });
+      }
+    };
+    
+    if (onError) {
+      eventSource.onerror = onError;
+    }
+    
+    return eventSource;
+  }
+
+  // =====================================================================
+  // Log Streaming Endpoints
+  // =====================================================================
+
+  /**
+   * Get recent log entries (non-streaming)
+   */
+  async getLogs(): Promise<{ logs: LogEntry[]; total: number }> {
+    const response = await this.client.get('/logs');
+    return response.data;
+  }
+
+  /**
+   * Send a test log entry
+   */
+  async sendTestLog(): Promise<{ status: string }> {
+    const response = await this.client.post('/logs/test');
+    return response.data;
+  }
+
+  /**
+   * Send a log entry from the frontend
+   */
+  async sendFrontendLog(level: string, message: string): Promise<{ status: string }> {
+    const response = await this.client.post('/logs/frontend', { level, message });
+    return response.data;
+  }
+
+  /**
+   * Connect to the logs stream (SSE)
+   */
+  connectLogsStream(
+    onLog: (log: LogEntry) => void,
+    onError?: (error: Event) => void
+  ): EventSource {
+    const eventSource = new EventSource(`${API_BASE_URL}/logs/stream`);
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.event === 'log') {
+          onLog(data.data as LogEntry);
+        }
+      } catch (error) {
+        console.error('Failed to parse log entry:', error);
+      }
+    };
+    
+    if (onError) {
+      eventSource.onerror = onError;
+    }
+    
+    return eventSource;
+  }
 }
 
 // =====================================================================
@@ -264,6 +407,13 @@ export const {
   getThreatDistribution,
   getThreatById,
   getStats,
+  getModelInfo,
+  sendTestNotification,
+  connectNotifications,
+  getLogs,
+  sendTestLog,
+  sendFrontendLog,
+  connectLogsStream,
 } = api;
 
 // Export the class for testing or custom instances

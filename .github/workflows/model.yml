@@ -34,81 +34,49 @@ jobs:
             echo "Model file found"
             echo "size=$(ls -lh ${{ env.MODEL_PATH }} | awk '{print $5}')" >> $GITHUB_OUTPUT
           else
-            echo "ERROR: Model file not found at ${{ env.MODEL_PATH }}"
-            echo "Please ensure the model is committed to the repository with Git LFS"
+            echo "ERROR: Model file not found"
             exit 1
           fi
 
       - name: Get model checksum
         id: checksum
         run: |
-          echo "sha256=$(sha256sum "${{ env.MODEL_PATH }}" | awk '{print $1}')" >> $GITHUB_OUTPUT
+          echo "sha256=$(sha256sum ${{ env.MODEL_PATH }} | awk '{print $1}')" >> $GITHUB_OUTPUT
 
       - name: Create Release
         id: create_release
         run: |
           TAG_NAME="model-${{ inputs.model_version }}"
-          
-          # Check if release already exists and delete it
-          EXISTING_RELEASE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+
+          # Check if release already exists
+          EXISTING=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG_NAME" || true)
-          
-          if echo "$EXISTING_RELEASE" | grep -q '"id"'; then
-            echo "Release already exists, deleting old release..."
-            RELEASE_ID=$(echo "$EXISTING_RELEASE" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+
+          if echo "$EXISTING" | grep -q '"id"'; then
+            echo "Deleting existing release..."
+            ID=$(echo "$EXISTING" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
             curl -s -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID"
+              "https://api.github.com/repos/${{ github.repository }}/releases/$ID"
           fi
-          
-          # Create new release
-          RELEASE_RESPONSE=$(curl -s -X POST \
+
+          # Create release
+          RESP=$(curl -s -X POST \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Content-Type: application/json" \
             "https://api.github.com/repos/${{ github.repository }}/releases" \
-            -d "{
-              \"tag_name\": \"$TAG_NAME\",
-              \"name\": \"Model ${{ inputs.model_version }}\",
-              \"body\": \"Model: ${{ env.MODEL_NAME }}\",
-              \"draft\": false,
-              \"prerelease\": false
-            }")
-          
-          # Extract upload URL
-          UPLOAD_URL=$(echo "$RELEASE_RESPONSE" | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-upload_url = data.get('upload_url', '')
-if upload_url:
-    upload_url = upload_url.replace('{?name,label}', '')
-print(upload_url)
-")
-          
-          if [ -z "$UPLOAD_URL" ]; then
-            echo "ERROR: Failed to get upload URL from release response"
-            echo "Response: $RELEASE_RESPONSE"
-            exit 1
-          fi
-          
-          echo "upload_url=$UPLOAD_URL" >> $GITHUB_OUTPUT
-          echo "Release created successfully"
+            -d "{\"tag_name\":\"$TAG_NAME\",\"name\":\"Model ${{ inputs.model_version }}\",\"body\":\"Model: ${{ env.MODEL_NAME }}\",\"draft\":false,\"prerelease\":false}")
+
+          URL=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('upload_url','').replace('{?name,label}',''))")
+          echo "upload_url=$URL" >> $GITHUB_OUTPUT
 
       - name: Upload Model Asset
         run: |
-          echo "Uploading model to release..."
-          UPLOAD_URL="${{ steps.create_release.outputs.upload_url }}"
-          
-          if [ -z "$UPLOAD_URL" ]; then
-            echo "ERROR: No upload URL available"
-            exit 1
-          fi
-          
           curl -s -X POST \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @"${{ env.MODEL_PATH }}" \
-            "$UPLOAD_URL?name=${{ env.MODEL_NAME }}"
-          
-          echo "Model uploaded successfully!"
+            "${{ steps.create_release.outputs.upload_url }}?name=${{ env.MODEL_NAME }}"
+          echo "Model uploaded!"
 
   download-model:
     runs-on: ubuntu-latest
@@ -118,19 +86,10 @@ print(upload_url)
         run: |
           ASSETS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/releases/latest" | \
-            python3 -c "import sys, json; print(json.load(sys.stdin).get('assets', []))")
-          
-          ASSET_ID=$(echo "$ASSETS" | python3 -c "
-import sys, json
-model_name = '${{ env.MODEL_NAME }}'
-for asset in json.load(sys.stdin):
-    if model_name in asset.get('name', ''):
-        print(asset['id'])
-        break")
-          
-          if [ -n "$ASSET_ID" ]; then
-            echo "asset_id=$ASSET_ID" >> $GITHUB_OUTPUT
-          fi
+            python3 -c "import sys,json; print(json.load(sys.stdin).get('assets',[]))")
+
+          ID=$(echo "$ASSETS" | python3 -c "import sys,json; name='${{ env.MODEL_NAME }}'; print([a['id'] for a in json.load(sys.stdin) if name in a.get('name','')][0] if any(name in a.get('name','') for a in json.load(sys.stdin)) else '')")
+          [ -n "$ID" ] && echo "asset_id=$ID" >> $GITHUB_OUTPUT
 
       - name: Download model asset
         id: download
@@ -144,9 +103,4 @@ for asset in json.load(sys.stdin):
       - name: Verify model file
         if: steps.download.outputs.model_path
         run: |
-          if [ -f "${{ env.MODEL_PATH }}" ]; then
-            ls -lh "${{ env.MODEL_PATH }}"
-          else
-            echo "ERROR: Model file not found after download"
-            exit 1
-          fi
+          ls -lh "${{ env.MODEL_PATH }}"

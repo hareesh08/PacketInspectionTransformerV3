@@ -18,9 +18,6 @@ env:
   MODEL_NAME: finetuned_best_model.pth
 
 jobs:
-  # -------------------------------------------------------------------------
-  # Upload Model to GitHub Releases
-  # -------------------------------------------------------------------------
   upload-model:
     if: inputs.upload
     runs-on: ubuntu-latest
@@ -42,7 +39,6 @@ jobs:
       - name: Check model file
         id: check-local-model
         run: |
-          # Check if model file exists locally
           if [ -f "${{ env.MODEL_PATH }}" ]; then
             echo "Model file found locally"
             echo "local_model_exists=true" >> $GITHUB_OUTPUT
@@ -53,25 +49,36 @@ jobs:
 
       - name: Download model from HuggingFace
         id: download-model
-        if: "!steps.check-local-model.outputs.local_model_exists"
+        if: steps.check-local-model.outputs.local_model_exists != 'true'
         run: |
           echo "Model not found locally, downloading from HuggingFace..."
           
-          # Create model directory
           mkdir -p model
           
-          # Download model from HuggingFace Hub
-          # Using huggingface_hub CLI or direct download
+          # Try huggingface-cli first
           if command -v huggingface-cli &> /dev/null; then
             echo "Downloading using huggingface-cli..."
-            huggingface-cli download PacketInspectionTransformer/finetuned_best_model \
-              --local-dir model/finetuned_best_model.pth \
-              --local-dir-use-symlinks false
+            huggingforce-cli download PacketInspectionTransformer/finetuned_best_model \
+              --local-dir "${{ env.MODEL_PATH }}" \
+              --local-dir-use-symlinks false || \
+            python3 -c "
+import huggingface_hub
+huggingface_hub.hf_hub_download(
+    repo_id='PacketInspectionTransformer/finetuned_best_model',
+    filename='finetuned_best_model.pth',
+    local_dir='${{ env.MODEL_PATH }}',
+    local_dir_use_symlinks=False
+)"
           else
-            # Fallback: download using curl from HuggingFace Hub
-            echo "Downloading using direct URL..."
-            MODEL_URL="https://huggingface.co/PacketInspectionTransformer/finetuned_best_model/resolve/main/finetuned_best_model.pth"
-            curl -L -o "${{ env.MODEL_PATH }}" "$MODEL_URL"
+            # Fallback to Python API
+            python3 -c "
+import huggingface_hub
+huggingface_hub.hf_hub_download(
+    repo_id='PacketInspectionTransformer/finetuned_best_model',
+    filename='finetuned_best_model.pth',
+    local_dir='${{ env.MODEL_PATH }}',
+    local_dir_use_symlinks=False
+)"
           fi
           
           # Verify download
@@ -79,8 +86,7 @@ jobs:
             echo "Model downloaded successfully"
             ls -lh "${{ env.MODEL_PATH }}"
           else
-            echo "Failed to download model from external source"
-            echo "Please ensure MODEL_DOWNLOAD_URL environment variable is set or push the model file to the repository"
+            echo "ERROR: Model download failed!"
             exit 1
           fi
 
@@ -91,21 +97,21 @@ jobs:
             echo "Model file found"
             echo "size=$(ls -lh ${{ env.MODEL_PATH }} | awk '{print $5}')" >> $GITHUB_OUTPUT
           else
-            echo "Model file not found!"
+            echo "ERROR: Model file not found!"
             exit 1
           fi
 
       - name: Get model checksum
         id: checksum
         run: |
-          echo "sha256=$(sha256sum ${{ env.MODEL_PATH }} | awk '{print $1}')" >> $GITHUB_OUTPUT
+          echo "sha256=$(sha256sum "${{ env.MODEL_PATH }}" | awk '{print $1}')" >> $GITHUB_OUTPUT
 
-      - name: Create Release via GitHub API
+      - name: Create Release
         id: create_release
         run: |
           TAG_NAME="model-${{ inputs.model_version }}"
           
-          # Check if release already exists
+          # Check if release already exists and delete it
           EXISTING_RELEASE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG_NAME" || true)
           
@@ -121,36 +127,43 @@ jobs:
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Content-Type: application/json" \
             "https://api.github.com/repos/${{ github.repository }}/releases" \
-            -d '{
-              "tag_name": "'"$TAG_NAME"'",
-              "name": "Model ${{ inputs.model_version }}",
-              "body": "## Packet Inspection Transformer Model\n\n### Model Information\n- **Version**: ${{ inputs.model_version }}\n- **File**: ${{ env.MODEL_NAME }}\n- **Size**: ${{ steps.check_model.outputs.size }}\n- **SHA256**: ${{ steps.checksum.outputs.sha256 }}\n\n## Usage\nDownload the model file and place it in the `model/` directory.",
-              "draft": false,
-              "prerelease": false
-            }')
+            -d "{
+              \"tag_name\": \"$TAG_NAME\",
+              \"name\": \"Model ${{ inputs.model_version }}\",
+              \"body\": \"Model: ${{ env.MODEL_NAME }}\",
+              \"draft\": false,
+              \"prerelease\": false
+            }")
           
-          # Debug: print release response
-          echo "DEBUG: Release response: $RELEASE_RESPONSE"
-          
-          # Extract upload URL properly
+          # Extract upload URL
           UPLOAD_URL=$(echo "$RELEASE_RESPONSE" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 upload_url = data.get('upload_url', '')
-# Remove {?name,label} suffix
 if upload_url:
     upload_url = upload_url.replace('{?name,label}', '')
 print(upload_url)
 ")
           
+          if [ -z "$UPLOAD_URL" ]; then
+            echo "ERROR: Failed to get upload URL from release response"
+            echo "Response: $RELEASE_RESPONSE"
+            exit 1
+          fi
+          
           echo "upload_url=$UPLOAD_URL" >> $GITHUB_OUTPUT
-          echo "Release created successfully with upload URL: $UPLOAD_URL"
+          echo "Release created successfully"
 
       - name: Upload Model Asset
         run: |
+          echo "Uploading model to release..."
           UPLOAD_URL="${{ steps.create_release.outputs.upload_url }}"
           
-          echo "Uploading model to release..."
+          if [ -z "$UPLOAD_URL" ]; then
+            echo "ERROR: No upload URL available"
+            exit 1
+          fi
+          
           curl -s -X POST \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Content-Type: application/octet-stream" \
@@ -159,62 +172,43 @@ print(upload_url)
           
           echo "Model uploaded successfully!"
 
-  # -------------------------------------------------------------------------
-  # Download Model from GitHub Releases
-  # -------------------------------------------------------------------------
   download-model:
     runs-on: ubuntu-latest
-    outputs:
-      model_path: ${{ steps.download.outputs.model_path }}
     steps:
-      - name: Get latest model release via GitHub API
+      - name: Get latest release
         id: latest_release
         run: |
-          # Get the latest model release using GitHub API
-          RELEASE_INFO=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/latest" \
-            | grep -E '"tag_name"|"assets"' || true)
+          ASSETS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/latest" | \
+            python3 -c "import sys, json; print(json.load(sys.stdin).get('assets', []))")
           
-          # Check if we found a release
-          if echo "$RELEASE_INFO" | grep -q "tag_name"; then
-            echo "Found latest release"
-            # Get the asset ID for the model file
-            ASSET_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              "https://api.github.com/repos/${{ github.repository }}/releases/latest" \
-              | python3 -c "import sys, json; assets=json.load(sys.stdin).get('assets',[]); print([a['id'] for a in assets if '${{ env.MODEL_NAME }}' in a.get('name','')][0] if any('${{ env.MODEL_NAME }}' in a.get('name','') for a in assets) else '')")
-            
-            if [ -n "$ASSET_ID" ]; then
-              echo "asset_id=$ASSET_ID" >> $GITHUB_OUTPUT
-              echo "Found model asset with ID: $ASSET_ID"
-            else
-              echo "No model asset found in latest release"
-            fi
-          else
-            echo "No release found"
+          ASSET_ID=$(echo "$ASSETS" | python3 -c "
+import sys, json
+model_name = '${{ env.MODEL_NAME }}'
+for asset in json.load(sys.stdin):
+    if model_name in asset.get('name', ''):
+        print(asset['id'])
+        break")
+          
+          if [ -n "$ASSET_ID" ]; then
+            echo "asset_id=$ASSET_ID" >> $GITHUB_OUTPUT
           fi
 
       - name: Download model asset
         id: download
         if: steps.latest_release.outputs.asset_id
         run: |
-          ASSET_ID="${{ steps.latest_release.outputs.asset_id }}"
-          
-          echo "Downloading model asset ID: $ASSET_ID"
           curl -L -o "${{ env.MODEL_PATH }}" \
-            -H "Accept: application/octet-stream" \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/assets/$ASSET_ID"
-          
+            "https://api.github.com/repos/${{ github.repository }}/releases/assets/${{ steps.latest_release.outputs.asset_id }}"
           echo "model_path=${{ env.MODEL_PATH }}" >> $GITHUB_OUTPUT
-          echo "Model downloaded to: ${{ env.MODEL_PATH }}"
 
       - name: Verify model file
         if: steps.download.outputs.model_path
         run: |
           if [ -f "${{ env.MODEL_PATH }}" ]; then
-            echo "Model file downloaded successfully"
             ls -lh "${{ env.MODEL_PATH }}"
           else
-            echo "Model file not found after download"
+            echo "ERROR: Model file not found after download"
             exit 1
           fi

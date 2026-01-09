@@ -25,14 +25,18 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1"
 }
 
-# Configuration
-PROJECT_DIR="/opt/packet-inspection-transformer"
+# Get script directory for local operations
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Configuration (for production deployment)
 VENV_PATH="$PROJECT_DIR/venv"
 DASHBOARD_PATH="$PROJECT_DIR/dashboard"
 NGINX_CONFIG="/etc/nginx/sites-available/packet-inspection-transformer"
 NGINX_ENABLED="/etc/nginx/sites-enabled/packet-inspection-transformer"
 SYSTEMD_SERVICE="/etc/systemd/system/packet-inspection-transformer.service"
 PID_FILE="/tmp/uvicorn.pid"
+MODEL_DIR="$PROJECT_DIR/model"
 
 # Confirmation prompt
 confirm_clean() {
@@ -176,6 +180,30 @@ remove_systemd_service() {
     fi
 }
 
+# Remove threats database (for local development)
+remove_threats_db() {
+    log_info "Removing threats.db..."
+    
+    if [ -f "$PROJECT_DIR/threats.db" ]; then
+        rm -f "$PROJECT_DIR/threats.db"
+        log_success "threats.db removed successfully"
+    else
+        log_info "threats.db not found, skipping"
+    fi
+}
+
+# Create model folder (for local development)
+create_model_folder() {
+    log_info "Ensuring model folder exists..."
+    
+    if [ ! -d "$MODEL_DIR" ]; then
+        mkdir -p "$MODEL_DIR"
+        log_success "Model folder created at $MODEL_DIR"
+    else
+        log_info "Model folder already exists at $MODEL_DIR"
+    fi
+}
+
 # Main function
 main() {
     echo "=============================================="
@@ -192,6 +220,10 @@ main() {
     remove_nginx_config
     remove_logs
     remove_systemd_service
+    
+    # Local development cleanup
+    remove_threats_db
+    create_model_folder
     
     echo ""
     echo "=============================================="

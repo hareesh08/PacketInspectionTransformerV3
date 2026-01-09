@@ -4,7 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="8841923a-3a8c-410b-8e39-f8f2178fb268" name="Changes" comment="Docker implement">
+    <list default="true" id="8841923a-3a8c-410b-8e39-f8f2178fb268" name="Changes" comment="docker-deploy.sh fix">
+      <change afterPath="$PROJECT_DIR$/deploy/cleanup.sh" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -61,7 +62,7 @@
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "settings.editor.selected.configurable": "project.propVCSSupport.ChangelistConflict",
     "ts.external.directory.path": "D:\\Python-25\\PacketInspectionTransformerV3\\Frontend\\node_modules\\typescript\\lib",
     "vue.rearranger.settings.migration": "true"
   }
@@ -90,7 +91,7 @@
       <workItem from="1767942728803" duration="901000" />
       <workItem from="1767943702140" duration="1085000" />
       <workItem from="1767945098859" duration="3270000" />
-      <workItem from="1767948834710" duration="13493000" />
+      <workItem from="1767948834710" duration="18990000" />
     </task>
     <task id="LOCAL-00001" summary="updated ui,notification, deployment">
       <option name="closed" value="true" />
@@ -148,7 +149,23 @@
       <option name="project" value="LOCAL" />
       <updated>1767963701656</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="fixing front end">
+      <option name="closed" value="true" />
+      <created>1767964222895</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1767964222895</updated>
+    </task>
+    <task id="LOCAL-00009" summary="docker-deploy.sh fix">
+      <option name="closed" value="true" />
+      <created>1767964382616</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1767964382616</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -159,7 +176,9 @@
     <MESSAGE value="updated favicon.ico" />
     <MESSAGE value="updated Deployment" />
     <MESSAGE value="Docker implement" />
-    <option name="LAST_COMMIT_MESSAGE" value="Docker implement" />
+    <MESSAGE value="fixing front end" />
+    <MESSAGE value="docker-deploy.sh fix" />
+    <option name="LAST_COMMIT_MESSAGE" value="docker-deploy.sh fix" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/PacketInspectionTransformerV3$run.coverage" NAME="run Coverage Results" MODIFIED="1767938496545" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />

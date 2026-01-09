@@ -30,6 +30,15 @@ jobs:
         with:
           lfs: true
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install HuggingFace Hub
+        run: |
+          pip install -U huggingface_hub
+
       - name: Check model file
         id: check-local-model
         run: |
@@ -42,24 +51,36 @@ jobs:
             echo "local_model_exists=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Download model from external source
-        id: download-external
+      - name: Download model from HuggingFace
+        id: download-model
         if: "!steps.check-local-model.outputs.local_model_exists"
         run: |
-          echo "Model not found locally, checking for external source..."
+          echo "Model not found locally, downloading from HuggingFace..."
           
-          echo "Model not found locally, checking for external source..."
-          # Check if there's a model URL provided or use a default
-          MODEL_URL="${MODEL_DOWNLOAD_URL:-}"
+          # Create model directory
+          mkdir -p model
           
-          if [ -n "$MODEL_URL" ]; then
-            echo "Downloading model from external source..."
-            mkdir -p model
-            curl -L -o "${{ env.MODEL_PATH }}" "$MODEL_URL"
-            echo "Model downloaded from external source"
+          # Download model from HuggingFace Hub
+          # Using huggingface_hub CLI or direct download
+          if command -v huggingface-cli &> /dev/null; then
+            echo "Downloading using huggingface-cli..."
+            huggingface-cli download PacketInspectionTransformer/finetuned_best_model \
+              --local-dir model/finetuned_best_model.pth \
+              --local-dir-use-symlinks false
           else
-            echo "No external model URL configured and model not found locally"
-            echo "Please ensure model/finetuned_best_model.pth exists locally"
+            # Fallback: download using curl from HuggingFace Hub
+            echo "Downloading using direct URL..."
+            MODEL_URL="https://huggingface.co/PacketInspectionTransformer/finetuned_best_model/resolve/main/finetuned_best_model.pth"
+            curl -L -o "${{ env.MODEL_PATH }}" "$MODEL_URL"
+          fi
+          
+          # Verify download
+          if [ -f "${{ env.MODEL_PATH }}" ]; then
+            echo "Model downloaded successfully"
+            ls -lh "${{ env.MODEL_PATH }}"
+          else
+            echo "Failed to download model from external source"
+            echo "Please ensure MODEL_DOWNLOAD_URL environment variable is set or push the model file to the repository"
             exit 1
           fi
 

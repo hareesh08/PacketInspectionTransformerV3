@@ -37,8 +37,8 @@ scp -r "D:\Python-25\PacketInspectionTransformerV3\deploy" root@<VM_IP>:/root/Pa
 
 **Example with actual IP:**
 ```bash
-scp model/finetuned_best_model.pth root@157.245.97.220:/root/PacketInspectionTransformerV3/model/
-scp -r deploy root@157.245.97.220:/root/PacketInspectionTransformerV3/
+scp model/finetuned_best_model.pth root@<VM_IP>:/root/PacketInspectionTransformerV3/model/
+scp -r deploy root@<VM_IP>:/root/PacketInspectionTransformerV3/
 ```
 
 ### 3. Prepare the Server
@@ -195,16 +195,18 @@ sudo docker inspect packet-inspection-backend
 
 ### Frontend shows "Failed to connect to backend"
 
-This usually happens when the frontend API URL is pointing to localhost instead of the server IP.
+The frontend now auto-detects the API URL based on the current host:
+- If running on `localhost`, it connects to `http://localhost:8000`
+- If running on a remote server, it connects to the same host on port 8000
 
-**Check and fix the API URL:**
+**If auto-detection doesn't work, manually set the API URL:**
 
 1. Edit `Frontend/.env`:
 ```bash
-# Change from:
-VITE_API_URL=http://localhost:8000
-# To:
-VITE_API_URL=http://157.245.97.220
+# Set your server IP or use "auto" for automatic detection
+VITE_API_URL=http://167.71.233.93
+# Or use "auto" to detect automatically:
+VITE_API_URL=auto
 ```
 
 2. Commit and push the change:
@@ -299,10 +301,13 @@ scp root@<VM_IP>:/root/PacketInspectionTransformerV3/logs/ ./logs/
 
 ## Server IP Reference
 
+The frontend auto-detects the API URL, so no manual configuration is needed. Just access the application at:
+- **http://<VM_IP>** - The frontend will automatically connect to port 8000 on the same host
+
 | Server | IP |
 |--------|-----|
-| Primary VM | 157.245.97.220 |
-| Secondary VM | 143.110.241.116 |
+| Current VM | 167.71.233.93 |
+| Previous VMs | 157.245.97.220, 143.110.241.116 |
 
 ## Auto-Install Details
 

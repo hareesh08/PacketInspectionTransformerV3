@@ -141,7 +141,7 @@ export default function Dashboard() {
         <div className="mb-4 p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive">
           <p className="font-medium">Failed to connect to backend</p>
           <p className="text-sm mt-1">{error}</p>
-          <p className="text-sm mt-2">Make sure the backend is running at http://157.245.97.220</p>
+          <p className="text-sm mt-2">Make sure the backend is running on port 8000</p>
         </div>
       )}
 

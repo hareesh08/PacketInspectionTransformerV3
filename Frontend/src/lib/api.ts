@@ -6,8 +6,27 @@
 import axios, { AxiosError, AxiosInstance, AxiosResponse } from 'axios';
 import { ModelInfoResponse, Notification, LogEntry } from '@/types';
 
+// Auto-detect API base URL based on current host
+function getApiBaseUrl(): string {
+  const envUrl = import.meta.env.VITE_API_URL;
+  
+  // If set to "auto" or not set, detect automatically
+  if (!envUrl || envUrl === 'auto') {
+    const { hostname, protocol } = window.location;
+    // If running on localhost, use localhost:8000
+    // Otherwise use the same host on port 8000
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:8000';
+    }
+    // For remote servers, use same hostname with port 8000
+    return `${protocol}//${hostname}:8000`;
+  }
+  
+  return envUrl;
+}
+
 // API Base URL - configurable via environment variable
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = getApiBaseUrl();
 
 // Request timeout in milliseconds (increased for large file scans)
 const REQUEST_TIMEOUT = 300000; // 5 minutes

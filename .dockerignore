@@ -6,7 +6,7 @@
 .git
 .gitignore
 
-# IDE
+# IDE / Editors
 .idea
 .vscode
 *.swp
@@ -17,21 +17,32 @@
 Thumbs.db
 
 # Logs
-logs
+logs/
 *.log
 
-# Tests
-tests
-__pycache__
+# Python
+__pycache__/
 *.pyc
 *.pyo
+*.pth
+venv/
 
-# Frontend build (if exists)
-dashboard/dist
+# Tests
+tests/
 
-# Model files (mounted separately)
-model/*.pth
+# Node / Frontend
+node_modules/
+Frontend/node_modules/
+Frontend/dist/
+dashboard/dist/
 
-# Deployment scripts (not needed inside container)
-deploy
+# Environment / Secrets
+.env
+
+# Databases
+*.db
+
+# Deployment / CI scripts
+deploy/
 *.sh
+

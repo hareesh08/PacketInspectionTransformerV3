@@ -97,6 +97,13 @@ build_frontend() {
         return
     fi
     
+    # Check if npm is installed, install if not
+    if ! command -v npm &> /dev/null; then
+        log_info "Installing Node.js and npm..."
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash
+        apt-get install -y nodejs
+    fi
+    
     cd Frontend
     
     # Clear vite cache to fix stale imports

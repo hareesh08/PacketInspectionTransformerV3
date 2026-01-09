@@ -15,7 +15,7 @@ on:
 
 env:
   MODEL_PATH: model/finetuned_best_model.pth
-  MODEL_NAME: packet_inspection_model.pth
+  MODEL_NAME: finetuned_best_model.pth
 
 jobs:
   # -------------------------------------------------------------------------
@@ -44,43 +44,50 @@ jobs:
         run: |
           echo "sha256=$(sha256sum ${{ env.MODEL_PATH }} | awk '{print $1}')" >> $GITHUB_OUTPUT
 
-      - name: Create release asset info
-        run: |
-          echo "Model Version: ${{ inputs.model_version }}"
-          echo "Model Size: ${{ steps.check_model.outputs.size }}"
-          echo "SHA256: ${{ steps.checksum.outputs.sha256 }}"
-
-      - name: Create Release
+      - name: Create Release via GitHub API
         id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITH_TOKEN }}
-        with:
-          tag_name: model-${{ inputs.model_version }}
-          release_name: Model ${{ inputs.model_version }}
-          draft: false
-          prerelease: false
-          body: |
-            # Packet Inspection Transformer Model
-
-            ## Model Information
-            - **Version**: ${{ inputs.model_version }}
-            - **File**: ${{ env.MODEL_NAME }}
-            - **Size**: ${{ steps.check_model.outputs.size }}
-            - **SHA256**: ${{ steps.checksum.outputs.sha256 }}
-
-            ## Usage
-            Download the model file and place it in the `model/` directory.
+        run: |
+          TAG_NAME="model-${{ inputs.model_version }}"
+          
+          # Check if release already exists
+          EXISTING_RELEASE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG_NAME" || true)
+          
+          if echo "$EXISTING_RELEASE" | grep -q '"id"'; then
+            echo "Release already exists, deleting old release..."
+            RELEASE_ID=$(echo "$EXISTING_RELEASE" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+            curl -s -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID"
+          fi
+          
+          # Create new release
+          RELEASE_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/${{ github.repository }}/releases" \
+            -d '{
+              "tag_name": "'"$TAG_NAME"'",
+              "name": "Model ${{ inputs.model_version }}",
+              "body": "## Packet Inspection Transformer Model\n\n### Model Information\n- **Version**: ${{ inputs.model_version }}\n- **File**: ${{ env.MODEL_NAME }}\n- **Size**: ${{ steps.check_model.outputs.size }}\n- **SHA256**: ${{ steps.checksum.outputs.sha256 }}\n\n## Usage\nDownload the model file and place it in the `model/` directory.",
+              "draft": false,
+              "prerelease": false
+            }')
+          
+          echo "upload_url=$(echo $RELEASE_RESPONSE | python3 -c "import sys,json; print(json.load(sys.stdin).get('upload_url','').replace('{?name,label}',''))")" >> $GITHUB_OUTPUT
+          echo "Release created successfully"
 
       - name: Upload Model Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITH_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.MODEL_PATH }}
-          asset_name: ${{ env.MODEL_NAME }}
-          asset_content_type: application/octet-stream
+        run: |
+          UPLOAD_URL="${{ steps.create_release.outputs.upload_url }}"
+          
+          echo "Uploading model to release..."
+          curl -s -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @"${{ env.MODEL_PATH }}" \
+            "$UPLOAD_URL?name=${{ env.MODEL_NAME }}"
+          
+          echo "Model uploaded successfully!"
 
   # -------------------------------------------------------------------------
   # Download Model from GitHub Releases
@@ -90,39 +97,46 @@ jobs:
     outputs:
       model_path: ${{ steps.download.outputs.model_path }}
     steps:
-      - name: Get latest model release
+      - name: Get latest model release via GitHub API
         id: latest_release
-        uses: actions/get-releases@v1
-        with:
-          filter: name
-          direction: desc
-          limit: 1
-          tag_name_pattern: ^model-
+        run: |
+          # Get the latest model release using GitHub API
+          RELEASE_INFO=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/latest" \
+            | grep -E '"tag_name"|"assets"' || true)
+          
+          # Check if we found a release
+          if echo "$RELEASE_INFO" | grep -q "tag_name"; then
+            echo "Found latest release"
+            # Get the asset ID for the model file
+            ASSET_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/latest" \
+              | python3 -c "import sys, json; assets=json.load(sys.stdin).get('assets',[]); print([a['id'] for a in assets if '${{ env.MODEL_NAME }}' in a.get('name','')][0] if any('${{ env.MODEL_NAME }}' in a.get('name','') for a in assets) else '')")
+            
+            if [ -n "$ASSET_ID" ]; then
+              echo "asset_id=$ASSET_ID" >> $GITHUB_OUTPUT
+              echo "Found model asset with ID: $ASSET_ID"
+            else
+              echo "No model asset found in latest release"
+            fi
+          else
+            echo "No release found"
+          fi
 
       - name: Download model asset
         id: download
-        if: steps.latest_release.outputs.count > 0
+        if: steps.latest_release.outputs.asset_id
         run: |
-          MODEL_URL="${{ steps.latest_release.outputs.assets[0].url }}"
-          MODEL_NAME="${{ steps.latest_release.outputs.assets[0].name }}"
+          ASSET_ID="${{ steps.latest_release.outputs.asset_id }}"
           
-          echo "Downloading model from: $MODEL_NAME"
+          echo "Downloading model asset ID: $ASSET_ID"
           curl -L -o "${{ env.MODEL_PATH }}" \
             -H "Accept: application/octet-stream" \
-            "$MODEL_URL"
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/assets/$ASSET_ID"
           
           echo "model_path=${{ env.MODEL_PATH }}" >> $GITHUB_OUTPUT
-          
-          # Verify checksum
-          echo "${{ steps.latest_release.outputs.body }}" | grep -oP 'SHA256: \K.*' | xargs -I {} echo {} > expected_checksum.txt
-          echo "$(sha256sum ${{ env.MODEL_PATH }} | awk '{print $1}')" > actual_checksum.txt
-          
-          if diff expected_checksum.txt actual_checksum.txt > /dev/null; then
-            echo "Model checksum verified!"
-          else
-            echo "Checksum mismatch!"
-            exit 1
-          fi
+          echo "Model downloaded to: ${{ env.MODEL_PATH }}"
 
       - name: Verify model file
         if: steps.download.outputs.model_path

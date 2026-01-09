@@ -139,6 +139,19 @@ install_certbot() {
 create_directories() {
     log_info "Creating project directories..."
     mkdir -p "$PROJECT_DIR"/{model,logs,dashboard}
+    
+    # Copy project files to /opt/ if running from a different directory
+    CURRENT_DIR=$(pwd)
+    
+    # Handle running from deploy/ directory
+    if [ -f "../app.py" ]; then
+        log_info "Copying project files from $CURRENT_DIR/.. to $PROJECT_DIR..."
+        cp -r "$CURRENT_DIR"/../* "$PROJECT_DIR/" 2>/dev/null || true
+    elif [ "$CURRENT_DIR" != "$PROJECT_DIR" ] && [ -f "app.py" ]; then
+        log_info "Copying project files from $CURRENT_DIR to $PROJECT_DIR..."
+        cp -r "$CURRENT_DIR"/* "$PROJECT_DIR/" 2>/dev/null || true
+    fi
+    
     log_success "Directories created"
 }
 

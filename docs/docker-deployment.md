@@ -7,6 +7,7 @@ This guide explains how to deploy Packet Inspection Transformer using Docker con
 - Ubuntu/Debian Linux server
 - Git to clone the repository
 - Model file (uploaded via SCP)
+- SSH access to the VM
 
 ## Quick Start
 
@@ -16,12 +17,50 @@ This guide explains how to deploy Packet Inspection Transformer using Docker con
 # Clone the repository
 git clone https://github.com/hareesh08/PacketInspectionTransformerV3.git
 cd PacketInspectionTransformerV3
+```
 
-# Create model directory
-mkdir -p model
+### 2. Upload Files to Server
 
-# Upload your model file
-scp finetuned_best_model.pth user@<VM_IP>:/root/PacketInspectionTransformerV3/model/
+From your local machine, upload the model and deploy scripts:
+
+```bash
+# Upload the model file
+scp model/finetuned_best_model.pth root@<VM_IP>:/root/PacketInspectionTransformerV3/model/
+
+# Upload the deploy directory
+scp -r deploy root@<VM_IP>:/root/PacketInspectionTransformerV3/
+
+# Or using the full local path (Windows PowerShell):
+scp "D:\Python-25\PacketInspectionTransformerV3\model\finetuned_best_model.pth" root@<VM_IP>:/root/PacketInspectionTransformerV3/model/
+scp -r "D:\Python-25\PacketInspectionTransformerV3\deploy" root@<VM_IP>:/root/PacketInspectionTransformerV3/
+```
+
+**Example with actual IP:**
+```bash
+scp model/finetuned_best_model.pth root@157.245.97.220:/root/PacketInspectionTransformerV3/model/
+scp -r deploy root@157.245.97.220:/root/PacketInspectionTransformerV3/
+```
+
+### 3. Prepare the Server
+
+SSH into the server and run:
+
+```bash
+ssh root@<VM_IP>
+
+# Navigate to project directory
+cd ~/PacketInspectionTransformerV3
+
+# Clean up old files if needed
+rm -rf threats.db
+
+# Pull latest code
+git pull
+
+# If there are local changes causing conflicts:
+# git stash
+# git pull
+# git stash pop  # (if you want to keep local changes)
 ```
 
 ### 2. Install Docker (Auto-Install)
@@ -157,7 +196,18 @@ sudo docker inspect packet-inspection-backend
 ## Update Deployment
 
 ```bash
-# Pull latest code
+# Navigate to project directory
+cd ~/PacketInspectionTransformerV3
+
+# Check for local changes that might conflict
+git status
+
+# If there are local changes causing conflicts:
+git stash
+git pull
+git stash pop  # (if you want to keep local changes)
+
+# If no conflicts:
 git pull
 
 # Rebuild and restart
@@ -165,6 +215,51 @@ sudo ./deploy/docker-deploy.sh down
 sudo ./deploy/docker-deploy.sh build
 sudo ./deploy/docker-deploy.sh up
 ```
+
+### Handling Git Conflicts
+
+If `git pull` fails due to local changes:
+
+```bash
+# Stash local changes
+git stash
+
+# Pull latest
+git pull
+
+# Check what changed
+git diff stash@{0}
+
+# Apply stash if changes are needed, or drop to discard
+git stash pop  # Apply and remove stash
+# OR
+git stash drop  # Remove stash without applying
+```
+
+## File Transfer Commands
+
+Quick reference for transferring files from local machine to server:
+
+```bash
+# Upload model file
+scp model/finetuned_best_model.pth root@<VM_IP>:/root/PacketInspectionTransformerV3/model/
+
+# Upload deploy directory
+scp -r deploy root@<VM_IP>:/root/PacketInspectionTransformerV3/
+
+# Upload entire project
+scp -r . root@<VM_IP>:/root/PacketInspectionTransformerV3/ --exclude='.git' --exclude='node_modules' --exclude='Frontend/node_modules'
+
+# Download logs from server
+scp root@<VM_IP>:/root/PacketInspectionTransformerV3/logs/ ./logs/
+```
+
+## Server IP Reference
+
+| Server | IP |
+|--------|-----|
+| Primary VM | 157.245.97.220 |
+| Secondary VM | 143.110.241.116 |
 
 ## Auto-Install Details
 

@@ -1,4 +1,4 @@
-name: Model Management
+name: Model Management and Docker Build
 
 on:
   workflow_dispatch:
@@ -12,10 +12,24 @@ on:
         required: true
         type: boolean
         default: false
+      build_docker:
+        description: Build and push Docker images
+        required: true
+        type: boolean
+        default: true
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'model/**'
+      - 'Dockerfile'
+      - 'Frontend/Dockerfile'
+      - 'docker-compose.yml'
 
 permissions:
-  contents: read
-  releases: read
+  contents: write
+  packages: write
 
 env:
   MODEL_PATH: model/finetuned_best_model.pth
@@ -27,12 +41,15 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      releases: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           lfs: true
+
+      - name: Pull LFS files
+        run: |
+          git lfs pull
 
       - name: Verify model file exists
         id: check_model
@@ -103,6 +120,15 @@ jobs:
   download-model:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Pull LFS files
+        run: |
+          git lfs pull
+
       - name: Get latest release
         id: latest_release
         run: |
@@ -110,7 +136,6 @@ jobs:
           RESPONSE=$(curl -s -w "\n%{http_code}" -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/releases/latest")
           
-          # Extract HTTP status code (last line)
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
           
@@ -121,18 +146,15 @@ jobs:
             exit 0
           fi
            
-          # Check if response contains an error message
           if echo "$RESPONSE_BODY" | grep -q '"message":'; then
             echo "GitHub API error: $(echo "$RESPONSE_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('message', 'Unknown error'))")"
             echo "asset_id=" >> $GITHUB_OUTPUT
             exit 0
           fi
            
-          # Extract assets safely
           ASSETS=$(echo "$RESPONSE_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('assets',[]))" 2>/dev/null || echo "[]")
           echo "Found assets: $ASSETS"
            
-          # Find the model asset ID
           MODEL_NAME="${{ env.MODEL_NAME }}"
           ID=$(echo "$ASSETS" | python3 -c "
           import sys, json
@@ -178,3 +200,84 @@ jobs:
             echo "ERROR: Model file not found after download"
             exit 1
           fi
+
+  docker-build:
+    if: inputs.build_docker || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - service: backend
+            dockerfile: Dockerfile
+            context: .
+          - service: frontend
+            dockerfile: Frontend/Dockerfile
+            context: .
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Pull LFS files
+        run: |
+          git lfs pull
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}},value=${{ inputs.model_version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.model_version }}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  run-makefile:
+    if: inputs.build_docker || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    needs: docker-build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run make build
+        run: |
+          make build
+
+      - name: Run make test
+        run: |
+          make test
+        continue-on-error: true
+
+      - name: Show status
+        run: |
+          make status
+        continue-on-error: true

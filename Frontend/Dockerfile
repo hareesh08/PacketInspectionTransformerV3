@@ -19,8 +19,8 @@ ENV NODE_ENV=production \
 # Copy package files first for better caching
 COPY Frontend/package*.json ./
 
-# Install dependencies
-RUN npm ci --quiet --no-audit
+# Install dependencies (use npm install for better compatibility)
+RUN npm install --quiet --no-audit
 
 # Copy source code
 COPY Frontend/ .

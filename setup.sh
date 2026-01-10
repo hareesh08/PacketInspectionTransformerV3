@@ -377,6 +377,30 @@ create_env_file() {
     fi
 }
 
+# Fix Dockerfiles if needed
+fix_dockerfiles() {
+    log_info "Checking and fixing Dockerfiles..."
+    
+    # Fix Frontend/Dockerfile - change npm ci to npm install
+    if [[ -f "Frontend/Dockerfile" ]]; then
+        if grep -q "npm ci --quiet --no-audit" "Frontend/Dockerfile"; then
+            log_info "Fixing Frontend/Dockerfile (npm ci -> npm install)"
+            sed -i 's/npm ci --quiet --no-audit/npm install --quiet --no-audit/g' "Frontend/Dockerfile"
+        fi
+        
+        # Fix apt-get to apk for Alpine nginx base image
+        if grep -q "apt-get update && apt-get install" "Frontend/Dockerfile"; then
+            log_info "Fixing Frontend/Dockerfile (apt-get -> apk)"
+            sed -i 's/apt-get update && apt-get install -y --no-install-recommends.*curl.*ca-certificates.*&& rm -rf \/var\/lib\/apt\/lists\*/apk add --no-cache curl ca-certificates/g' "Frontend/Dockerfile"
+        fi
+    fi
+    
+    # Ensure main Dockerfile has curl (Debian-based, uses apt-get)
+    if [[ -f "Dockerfile" ]]; then
+        log_info "Dockerfile looks good (Debian-based)"
+    fi
+}
+
 # Build and start containers
 deploy_containers() {
     log_info "Building and starting containers..."
@@ -384,9 +408,12 @@ deploy_containers() {
     # Set environment variables for build
     export DOMAIN="${VM_IP}"
     
-    # Build the images
-    log_info "Building Docker images..."
-    docker compose build --no-cache
+    # Fix Dockerfiles if needed
+    fix_dockerfiles
+    
+    # Build the images (no cache to ensure latest changes)
+    log_info "Building Docker images (this may take a few minutes)..."
+    docker compose build --no-cache --pull
     
     # Start the services
     log_info "Starting services..."
@@ -568,6 +595,7 @@ main() {
     generate_ssl_certificates
     update_nginx_config
     create_env_file
+    fix_dockerfiles
     deploy_containers
     wait_for_services
     configure_firewall

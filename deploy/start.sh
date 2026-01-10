@@ -21,6 +21,11 @@ BACKEND_PORT=8000
 FRONTEND_PORT=80
 NGINX_CONFIG_NAME="malware-detection"
 
+# Get absolute paths at script start
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+FRONTEND_DIR="$PROJECT_ROOT/Frontend"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -109,9 +114,6 @@ install_nodejs_with_nvm() {
 install_python_deps() {
     log_info "Installing Python dependencies..."
     
-    # Navigate to project root - use realpath for robust path resolution
-    SCRIPT_DIR="$(realpath "$(dirname "$0")")"
-    PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
     cd "$PROJECT_ROOT"
     
     # Create virtual environment if it doesn't exist
@@ -135,10 +137,7 @@ install_node_deps() {
     # Source NVM to ensure Node.js is available
     source_nvm
     
-    # Navigate to project root, then to Frontend directory
-    SCRIPT_DIR="$(realpath "$(dirname "$0")")"
-    PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-    cd "$PROJECT_ROOT/Frontend"
+    cd "$FRONTEND_DIR"
     
     # Install dependencies
     npm install
@@ -156,38 +155,15 @@ build_frontend() {
     # Source NVM to ensure Node.js is available
     source_nvm
     
-    # Navigate to project root, then to Frontend directory
-    SCRIPT_DIR="$(realpath "$(dirname "$0")")"
-    PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-    
     log_info "Script directory: $SCRIPT_DIR"
     log_info "Project root: $PROJECT_ROOT"
-    log_info "Current directory: $(pwd)"
+    log_info "Frontend directory: $FRONTEND_DIR"
     
-    # Find the frontend directory - check multiple possible locations
-    FRONTEND_DIR=""
-    
-    if [ -d "$PROJECT_ROOT/Frontend" ]; then
-        FRONTEND_DIR="$PROJECT_ROOT/Frontend"
-    elif [ -d "$PROJECT_ROOT" ]; then
-        # Check if Frontend folder exists directly in project root
-        for dir in "$PROJECT_ROOT"/*; do
-            if [ -d "$dir" ] && [[ "$dir" == *"Frontend"* ]] || [ -f "$dir/package.json" ]; then
-                FRONTEND_DIR="$dir"
-                break
-            fi
-        done
-    fi
-    
-    if [ -z "$FRONTEND_DIR" ]; then
-        log_error "Frontend directory not found. Checked locations:"
-        log_error "  - $PROJECT_ROOT/Frontend"
-        log_error "  - $PROJECT_ROOT"
+    if [ ! -d "$FRONTEND_DIR" ]; then
+        log_error "Frontend directory not found at: $FRONTEND_DIR"
         ls -la "$PROJECT_ROOT" 2>/dev/null || true
         return 1
     fi
-    
-    log_info "Found frontend directory: $FRONTEND_DIR"
     
     cd "$FRONTEND_DIR"
     
@@ -201,8 +177,8 @@ build_frontend() {
 setup_nginx() {
     log_info "Setting up nginx configuration..."
     
-    # Copy nginx configuration
-    cp "$(dirname "$0")/nginx.conf" "/etc/nginx/sites-available/$NGINX_CONFIG_NAME"
+    # Copy nginx configuration using absolute path
+    cp "$SCRIPT_DIR/nginx.conf" "/etc/nginx/sites-available/$NGINX_CONFIG_NAME"
     
     # Enable site
     ln -sf "/etc/nginx/sites-available/$NGINX_CONFIG_NAME" "/etc/nginx/sites-enabled/$NGINX_CONFIG_NAME"
@@ -220,9 +196,6 @@ setup_nginx() {
 start_backend() {
     log_info "Starting backend service..."
     
-    # Navigate to project root
-    SCRIPT_DIR="$(realpath "$(dirname "$0")")"
-    PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
     cd "$PROJECT_ROOT"
     
     # Create necessary directories
@@ -251,10 +224,7 @@ start_frontend() {
     # Source NVM to ensure Node.js is available
     source_nvm
     
-    # Navigate to project root, then to Frontend directory
-    SCRIPT_DIR="$(realpath "$(dirname "$0")")"
-    PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-    cd "$PROJECT_ROOT/Frontend"
+    cd "$FRONTEND_DIR"
     
     # Start frontend with PM2 (serve the built files)
     pm2 start "serve -s dist -l 3000" --name "malware-frontend" || pm2 restart malware-frontend
@@ -291,17 +261,12 @@ stop_services() {
 clean_cache() {
     log_info "Cleaning cache and temporary files..."
     
-    # Navigate to project root
-    SCRIPT_DIR="$(realpath "$(dirname "$0")")"
-    PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-    cd "$PROJECT_ROOT"
-    
     # Clean Python cache
-    find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-    find . -name "*.pyc" -delete 2>/dev/null || true
+    find "$PROJECT_ROOT" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+    find "$PROJECT_ROOT" -name "*.pyc" -delete 2>/dev/null || true
     
     # Clean Node.js cache
-    cd Frontend
+    cd "$FRONTEND_DIR"
     npm cache clean --force 2>/dev/null || true
     rm -rf node_modules/.cache 2>/dev/null || true
     rm -rf dist 2>/dev/null || true

@@ -812,5 +812,224 @@ For issues and questions:
 
 ---
 
-**Last Updated:** 2024
-**Version:** 1.0.0
+---
+
+## Appendix: IP-Based Deployment Troubleshooting
+
+### Problem Summary
+
+**Initial State:** Application deployment failed with frontend (pit-frontend) and certbot (pit-certbot) containers in constant crash-restart loop.
+
+**Root Cause:** The Nginx configuration was hardcoded to use HTTPS/SSL with Let's Encrypt certificates pointing to an IP address (206.189.138.156), which is impossible because Let's Encrypt only issues certificates for domain names, not raw IP addresses.
+
+**Symptoms:**
+- Frontend logs showed: `cannot load certificate "/etc/letsencrypt/live/206.189.138.156/fullchain.pem": No such file or directory`
+- Containers restarting every few seconds
+- Application inaccessible via browser
+
+### Complete Fix Applied
+
+#### 1. Stop Crashing Containers
+
+```bash
+docker stop pit-frontend pit-certbot
+docker rm pit-frontend pit-certbot
+```
+
+#### 2. Create HTTP-Only Nginx Configuration
+
+Use the provided `nginx-http.conf` in project root:
+
+```bash
+docker run -d \
+  --name pit-frontend \
+  --network packetinspectiontransformerv3_pit-network \
+  -p 80:80 \
+  -v $(pwd)/nginx-http.conf:/etc/nginx/conf.d/default.conf \
+  packetinspectiontransformerv3-frontend
+```
+
+#### 3. Verify Deployment
+
+```bash
+# Check container status
+docker ps
+
+# Test locally
+curl -v http://localhost
+```
+
+### Final Working State
+
+| Container | Status | Ports | Health |
+|-----------|--------|-------|--------|
+| pit-frontend | ✅ Running | 0.0.0.0:80->80/tcp | Healthy |
+| pit-backend | ✅ Running | 0.0.0.0:8000->8000/tcp | Healthy |
+
+### Access URLs
+
+| Service | URL |
+|---------|-----|
+| Frontend Application | http://206.189.138.156 |
+| Backend API | http://206.189.138.156:8000 |
+| API Documentation | http://206.189.138.156:8000/docs |
+
+### Key Technical Insights
+
+#### Why SSL Failed with IP Address
+
+- **Let's Encrypt Policy:** Cannot issue certificates for IP addresses
+- **Certificate Validation:** Requires domain ownership verification via DNS or HTTP challenges
+- **Configuration Lock:** Original Nginx config had no fallback mechanism for missing certificates
+
+#### Network Architecture
+
+```
+User Browser → (Port 80) → pit-frontend (Nginx) → /api/ → pit-backend (Port 8000)
+                                   ↓
+                         Static Files (/usr/share/nginx/html)
+```
+
+#### Docker Network Configuration
+
+- **Network:** `packetinspectiontransformerv3_pit-network` (user-defined bridge)
+- **Container-to-container communication:** Via service names (`pit-backend:8000`)
+- **Host port mapping:** `80:80` (frontend), `8000:8000` (backend)
+
+### Troubleshooting Commands Reference
+
+#### Basic Diagnostics
+
+```bash
+# Check container status
+docker ps -a
+
+# View container logs
+docker logs pit-frontend
+docker logs pit-backend
+
+# Test connectivity between containers
+docker exec pit-frontend curl -v http://pit-backend:8000/
+
+# Check Nginx configuration
+docker exec pit-frontend nginx -t
+```
+
+#### Network Troubleshooting
+
+```bash
+# Inspect network configuration
+docker network inspect packetinspectiontransformerv3_pit-network
+
+# Test port accessibility from host
+curl -v http://localhost:80
+curl -v http://localhost:8000
+
+# Check firewall status
+sudo ufw status
+```
+
+#### Configuration Validation
+
+```bash
+# Verify mounted Nginx config
+docker exec pit-frontend cat /etc/nginx/conf.d/default.conf
+
+# Check frontend build files
+docker exec pit-frontend ls -la /usr/share/nginx/html/
+```
+
+### Common Issues & Solutions
+
+#### Issue 1: "Backend not connected" in Frontend
+
+**Cause:** Frontend making requests to wrong URL or Nginx proxy misconfigured
+
+**Solution:**
+
+Check frontend API client configuration and verify Nginx proxy_pass directive:
+
+```bash
+docker exec pit-frontend cat /etc/nginx/conf.d/default.conf | grep -A5 "location /api/"
+```
+
+Ensure requests go to `/api/` endpoint, not direct backend URL.
+
+#### Issue 2: Frontend Container Won't Start
+
+```bash
+# Force remove and recreate
+docker rm -f pit-frontend
+docker run -d \
+  --name pit-frontend \
+  --network packetinspectiontransformerv3_pit-network \
+  -p 80:80 \
+  -v $(pwd)/nginx-http.conf:/etc/nginx/conf.d/default.conf \
+  packetinspectiontransformerv3-frontend
+```
+
+#### Issue 3: Port Already in Use
+
+```bash
+# Find process using port 80
+sudo lsof -i :80
+
+# Kill conflicting process or change Nginx port in docker run command
+# Change -p 80:80 to -p 8080:80 for alternative port
+```
+
+### Migration to Production (When Ready)
+
+#### With Domain Name
+
+1. Get a domain and point A record to 206.189.138.156
+2. Update Nginx config to use domain in `server_name`
+3. Re-enable SSL configuration with Let's Encrypt
+4. Use certbot container properly with domain validation
+
+#### Production Nginx Template
+
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com www.yourdomain.com;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name yourdomain.com www.yourdomain.com;
+    
+    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+    
+    # ... rest of configuration
+}
+```
+
+### Deployment Checklist
+
+- [ ] Backend container running on port 8000
+- [ ] Frontend container running on port 80 with HTTP config
+- [ ] Docker network properly configured
+- [ ] Nginx proxy passing `/api/` to backend
+- [ ] Static files served from `/usr/share/nginx/html`
+- [ ] SPA routing working (try_files directive)
+- [ ] Firewall allows ports 80 and 8000
+- [ ] (Optional) Configure domain name for SSL
+- [ ] (Optional) Set up HTTPS for production
+
+### Best Practices for Future Deployments
+
+1. **Environment-Specific Configs:** Maintain separate configurations for dev/staging/prod
+2. **Health Checks:** Implement `/health` endpoints in both frontend and backend
+3. **Logging:** Centralize Docker container logs for monitoring
+4. **Backup Configs:** Keep nginx-http.conf and other config files in version control
+5. **Documentation:** Update this guide with any environment-specific changes
+
+---
+
+**Last Updated:** 2024-01-10
+**Version:** 1.0.1
+**Status:** ✅ OPERATIONAL (HTTP mode)
+**Note:** For production use, acquire a domain name and implement HTTPS. The current HTTP configuration is suitable for development and testing purposes.

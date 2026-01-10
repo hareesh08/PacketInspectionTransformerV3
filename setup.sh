@@ -6,6 +6,7 @@
 # Fully automatic deployment for production environments
 # Supports access via https://<vmip> with self-signed SSL certificates
 # Includes automatic Docker installation if not present
+# Supports HTTP-only mode for IP-based deployments (no SSL)
 # =============================================================================
 
 set -e
@@ -15,13 +16,15 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-SCRIPT_VERSION="1.0.0"
+SCRIPT_VERSION="1.1.0"
 PROJECT_NAME="Packet Inspection Transformer"
 CONTAINER_PREFIX="pit"
 VM_IP=""
+DEPLOYMENT_MODE="auto"  # auto, http, https
 
 # Functions
 log_info() {
@@ -336,7 +339,7 @@ generate_ssl_certificates() {
     log_info "Certificate location: ${cert_dir}/"
 }
 
-# Update nginx configuration for IP-based access
+# Update nginx configuration for IP-based access (HTTPS mode)
 update_nginx_config() {
     log_info "Updating Nginx configuration for IP-based access..."
     
@@ -345,11 +348,77 @@ update_nginx_config() {
     # Replace ${DOMAIN:-localhost} with VM_IP in the nginx config
     if [[ -f "$conf_file" ]]; then
         sed -i "s/\${DOMAIN:-localhost}/${VM_IP}/g" "$conf_file"
-        log_success "Nginx configuration updated"
+        log_success "Nginx configuration updated (HTTPS mode)"
     else
         log_error "Nginx configuration file not found: $conf_file"
         exit 1
     fi
+}
+
+# Restore nginx configuration to template
+restore_nginx_config() {
+    log_info "Restoring Nginx configuration to template..."
+    
+    local conf_file="nginx/conf.d/default.conf"
+    local template_file="nginx/conf.d/default.conf.template"
+    
+    # If template exists, restore from it
+    if [[ -f "$template_file" ]]; then
+        cp "$template_file" "$conf_file"
+        log_success "Nginx configuration restored from template"
+    else
+        # Otherwise, just revert the domain substitution
+        if [[ -f "$conf_file" ]]; then
+            sed -i "s/${VM_IP}/\${DOMAIN:-localhost}/g" "$conf_file"
+            log_success "Nginx configuration reverted"
+        fi
+    fi
+}
+
+# Switch to HTTP-only mode (no SSL)
+switch_to_http_mode() {
+    log_info "Switching to HTTP-only mode..."
+    
+    local http_conf="nginx-http.conf"
+    local target_conf="nginx/conf.d/default.conf"
+    
+    # Backup current config if it exists
+    if [[ -f "$target_conf" ]]; then
+        cp "$target_conf" "${target_conf}.bak.$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
+    fi
+    
+    # Copy HTTP-only config
+    if [[ -f "$http_conf" ]]; then
+        cp "$http_conf" "$target_conf"
+        log_success "Switched to HTTP-only mode"
+    else
+        log_error "HTTP configuration file not found: $http_conf"
+        exit 1
+    fi
+    
+    DEPLOYMENT_MODE="http"
+}
+
+# Switch to HTTPS mode (with SSL)
+switch_to_https_mode() {
+    log_info "Switching to HTTPS mode..."
+    
+    local target_conf="nginx/conf.d/default.conf"
+    
+    # Restore from backup if available
+    local latest_backup=$(ls -t "${target_conf}.bak."* 2>/dev/null | head -1)
+    if [[ -n "$latest_backup" ]]; then
+        cp "$latest_backup" "$target_conf"
+        log_success "Restored HTTPS configuration from backup"
+    else
+        # Regenerate config
+        restore_nginx_config
+    fi
+    
+    # Regenerate SSL certificates
+    generate_ssl_certificates
+    
+    DEPLOYMENT_MODE="https"
 }
 
 # Create environment file
@@ -427,6 +496,45 @@ deploy_containers() {
     docker compose up -d
     
     log_success "Containers deployed"
+}
+
+# Quick rebuild (rebuild frontend only, restart containers)
+quick_rebuild() {
+    log_info "Performing quick rebuild (frontend only)..."
+    
+    # Rebuild frontend without full cache clean
+    log_info "Building frontend image..."
+    docker compose build frontend --no-cache
+    
+    # Restart containers
+    log_info "Restarting containers..."
+    docker compose up -d frontend
+    
+    log_success "Quick rebuild complete"
+}
+
+# Quick restart (no rebuild)
+quick_restart() {
+    log_info "Performing quick restart (no rebuild)..."
+    
+    docker compose restart
+    
+    log_success "Quick restart complete"
+}
+
+# Check SSL certificates and fallback to HTTP if missing
+ensure_ssl_or_fallback() {
+    local cert_dir="nginx/certificates/live/${VM_IP}"
+    local cert_file="${cert_dir}/fullchain.pem"
+    local key_file="${cert_dir}/privkey.pem"
+    
+    if [[ ! -f "$cert_file" || ! -f "$key_file" ]]; then
+        log_warning "SSL certificates not found. Falling back to HTTP mode..."
+        switch_to_http_mode
+        return 1  # Indicates fallback happened
+    fi
+    
+    return 0  # SSL is available
 }
 
 # Wait for services to be healthy
@@ -514,34 +622,75 @@ configure_firewall() {
 
 # Print deployment summary
 print_summary() {
+    local mode_text=""
+    if [[ "$DEPLOYMENT_MODE" == "http" ]]; then
+        mode_text="HTTP (No SSL)"
+    else
+        mode_text="HTTPS (Self-signed SSL)"
+    fi
+    
     echo ""
     echo "============================================================================="
     echo "                    ${GREEN}DEPLOYMENT COMPLETE${NC}"
     echo "============================================================================="
     echo ""
-    echo -e "${BLUE}Access your application:${NC}"
+    echo -e "${BLUE}Deployment Mode:${NC} ${CYAN}${mode_text}${NC}"
     echo ""
-    echo "  HTTPS:  ${GREEN}https://${VM_IP}${NC}"
-    echo ""
-    echo -e "${BLUE}Service Endpoints:${NC}"
-    echo ""
-    echo "  Frontend:  http://localhost:80 (HTTP redirect to HTTPS)"
-    echo "  Backend:   http://localhost:8000"
-    echo "  Health:    https://${VM_IP}/health"
-    echo "  API:       https://${VM_IP}/api/"
+    
+    if [[ "$DEPLOYMENT_MODE" == "http" ]]; then
+        echo -e "${BLUE}Access your application:${NC}"
+        echo ""
+        echo "  HTTP:   ${GREEN}http://${VM_IP}${NC}"
+        echo ""
+        echo -e "${BLUE}Service Endpoints:${NC}"
+        echo ""
+        echo "  Frontend:  http://localhost:80"
+        echo "  Backend:   http://localhost:8000"
+        echo "  Health:    http://${VM_IP}/health"
+        echo "  API:       http://${VM_IP}/api/"
+    else
+        echo -e "${BLUE}Access your application:${NC}"
+        echo ""
+        echo "  HTTPS:  ${GREEN}https://${VM_IP}${NC}"
+        echo ""
+        echo -e "${BLUE}Service Endpoints:${NC}"
+        echo ""
+        echo "  Frontend:  http://localhost:80 (HTTP redirect to HTTPS)"
+        echo "  Backend:   http://localhost:8000"
+        echo "  Health:    https://${VM_IP}/health"
+        echo "  API:       https://${VM_IP}/api/"
+    fi
+    
     echo ""
     echo -e "${BLUE}Useful Commands:${NC}"
     echo ""
+    echo "  Full deploy:  ./setup.sh"
+    echo "  Quick rebuild: ./setup.sh --quick-rebuild"
+    echo "  Quick restart: ./setup.sh --quick-restart"
+    echo "  Switch to HTTP:  ./setup.sh --http"
+    echo "  Switch to HTTPS: ./setup.sh --https"
     echo "  View logs:    docker compose logs -f"
     echo "  Stop:         docker compose down"
     echo "  Restart:      docker compose restart"
     echo "  Status:       docker compose ps"
     echo ""
-    echo -e "${BLUE}Note:${NC}"
-    echo ""
-    echo "  - Self-signed SSL certificate has been generated"
-    echo "  - Accept the certificate warning in your browser"
-    echo "  - For production, consider using Let's Encrypt with a domain"
+    
+    if [[ "$DEPLOYMENT_MODE" == "http" ]]; then
+        echo -e "${YELLOW}Note:${NC}"
+        echo ""
+        echo "  - Running in HTTP-only mode (no SSL)"
+        echo "  - Suitable for development and testing"
+        echo "  - For production, use HTTPS mode or acquire a domain"
+        echo "  - Run './setup.sh --https' to enable HTTPS"
+    else
+        echo -e "${BLUE}Note:${NC}"
+        echo ""
+        echo "  - Self-signed SSL certificate has been generated"
+        echo "  - Accept the certificate warning in your browser"
+        echo "  - For production, consider using Let's Encrypt with a domain"
+        echo "  - Run './setup.sh --http' to switch to HTTP-only mode"
+    fi
+    
     echo ""
     echo "============================================================================="
 }
@@ -582,8 +731,68 @@ verify_deployment() {
     fi
 }
 
-# Main execution
-main() {
+# Display help
+show_help() {
+    echo ""
+    echo "============================================================================="
+    echo "      ${GREEN}${PROJECT_NAME} - Deployment Script${NC}"
+    echo "                      Version: ${SCRIPT_VERSION}"
+    echo "============================================================================="
+    echo ""
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  -h, --help              Show this help message"
+    echo "  -a, --auto              Automatic deployment (default)"
+    echo "  --http                  Deploy in HTTP-only mode (no SSL)"
+    echo "  --https                 Deploy in HTTPS mode (with SSL)"
+    echo "  --quick-rebuild         Quick rebuild (frontend only, no cache clean)"
+    echo "  --quick-restart         Quick restart (no rebuild)"
+    echo "  --switch-http           Switch to HTTP mode (after deployment)"
+    echo "  --switch-https          Switch to HTTPS mode (after deployment)"
+    echo "  --status                Show container status"
+    echo "  --logs                  Show container logs"
+    echo "  --stop                  Stop all containers"
+    echo ""
+    echo "Examples:"
+    echo "  $0                      # Automatic deployment with SSL"
+    echo "  $0 --http               # Deploy without SSL (HTTP only)"
+    echo "  $0 --quick-rebuild      # Quick rebuild after code changes"
+    echo "  $0 --switch-http        # Switch running deployment to HTTP mode"
+    echo ""
+    echo "============================================================================="
+}
+
+# Show container status
+show_status() {
+    echo ""
+    echo "============================================================================="
+    echo "                    ${GREEN}Container Status${NC}"
+    echo "============================================================================="
+    echo ""
+    docker compose ps
+    echo ""
+}
+
+# Show container logs
+show_logs() {
+    echo ""
+    echo "============================================================================="
+    echo "                    ${GREEN}Container Logs${NC}"
+    echo "============================================================================="
+    echo ""
+    docker compose logs -f
+}
+
+# Stop all containers
+stop_containers() {
+    log_info "Stopping all containers..."
+    docker compose down
+    log_success "All containers stopped"
+}
+
+# Full deployment with automatic fallback
+full_deploy() {
     echo ""
     echo "============================================================================="
     echo "      ${GREEN}${PROJECT_NAME} - Automated Deployment Script${NC}"
@@ -599,8 +808,24 @@ main() {
     check_prerequisites
     stop_existing_containers
     create_directories
-    generate_ssl_certificates
-    update_nginx_config
+    
+    # Try HTTPS first, fallback to HTTP if SSL fails
+    if [[ "$DEPLOYMENT_MODE" == "auto" ]]; then
+        log_info "Attempting HTTPS deployment..."
+        if generate_ssl_certificates 2>/dev/null; then
+            update_nginx_config
+            DEPLOYMENT_MODE="https"
+        else
+            log_warning "SSL certificate generation failed, falling back to HTTP..."
+            switch_to_http_mode
+        fi
+    elif [[ "$DEPLOYMENT_MODE" == "https" ]]; then
+        generate_ssl_certificates
+        update_nginx_config
+    else
+        switch_to_http_mode
+    fi
+    
     create_env_file
     fix_dockerfiles
     deploy_containers
@@ -610,6 +835,76 @@ main() {
     echo ""
     verify_deployment
     print_summary
+}
+
+# Handle command line arguments
+handle_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            -a|--auto)
+                DEPLOYMENT_MODE="auto"
+                shift
+                ;;
+            --http)
+                DEPLOYMENT_MODE="http"
+                shift
+                ;;
+            --https)
+                DEPLOYMENT_MODE="https"
+                shift
+                ;;
+            --quick-rebuild)
+                detect_vm_ip
+                quick_rebuild
+                exit 0
+                ;;
+            --quick-restart)
+                quick_restart
+                exit 0
+                ;;
+            --switch-http)
+                detect_vm_ip
+                switch_to_http_mode
+                docker compose up -d
+                log_success "Switched to HTTP mode"
+                exit 0
+                ;;
+            --switch-https)
+                detect_vm_ip
+                switch_to_https_mode
+                docker compose up -d
+                log_success "Switched to HTTPS mode"
+                exit 0
+                ;;
+            --status)
+                show_status
+                exit 0
+                ;;
+            --logs)
+                show_logs
+                exit 0
+                ;;
+            --stop)
+                stop_containers
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+}
+
+# Main execution
+main() {
+    handle_args "$@"
+    full_deploy
 }
 
 # Run main function

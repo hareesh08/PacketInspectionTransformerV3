@@ -34,11 +34,8 @@ RUN npm run build
 # -----------------------------------------------------------------------------
 FROM nginx:alpine AS production
 
-# Install curl for health check and certbot for SSL
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+# Install curl for health check (using apk for Alpine)
+RUN apk add --no-cache curl ca-certificates
 
 # Set environment variables
 ENV NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx/conf.d

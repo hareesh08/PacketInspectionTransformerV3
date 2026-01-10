@@ -20,12 +20,8 @@ ENV NODE_ENV=production \
 COPY Frontend/package*.json ./
 
 # Install dependencies
-# Try npm ci first (faster), fall back to npm install if no lock file
-RUN if [ -f package-lock.json ]; then \
-        npm ci --quiet --no-audit; \
-    else \
-        npm install --no-audit; \
-    fi
+# Use npm install (not npm ci) since package-lock.json may be out of sync
+RUN npm install --no-audit
 
 # Copy source code (must be after npm install to leverage cache)
 COPY Frontend/ .

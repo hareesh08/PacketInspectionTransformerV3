@@ -109,8 +109,8 @@ install_nodejs_with_nvm() {
 install_python_deps() {
     log_info "Installing Python dependencies..."
     
-    # Navigate to project root
-    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    # Navigate to project root - use realpath for robust path resolution
+    SCRIPT_DIR="$(realpath "$(dirname "$0")")"
     PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
     cd "$PROJECT_ROOT"
     
@@ -136,7 +136,7 @@ install_node_deps() {
     source_nvm
     
     # Navigate to project root, then to Frontend directory
-    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    SCRIPT_DIR="$(realpath "$(dirname "$0")")"
     PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
     cd "$PROJECT_ROOT/Frontend"
     
@@ -157,8 +157,18 @@ build_frontend() {
     source_nvm
     
     # Navigate to project root, then to Frontend directory
-    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    SCRIPT_DIR="$(realpath "$(dirname "$0")")"
     PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+    
+    log_info "Script directory: $SCRIPT_DIR"
+    log_info "Project root: $PROJECT_ROOT"
+    log_info "Current directory: $(pwd)"
+    
+    if [ ! -d "$PROJECT_ROOT/Frontend" ]; then
+        log_error "Frontend directory not found at: $PROJECT_ROOT/Frontend"
+        return 1
+    fi
+    
     cd "$PROJECT_ROOT/Frontend"
     
     # Build for production
@@ -191,7 +201,7 @@ start_backend() {
     log_info "Starting backend service..."
     
     # Navigate to project root
-    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    SCRIPT_DIR="$(realpath "$(dirname "$0")")"
     PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
     cd "$PROJECT_ROOT"
     
@@ -222,7 +232,7 @@ start_frontend() {
     source_nvm
     
     # Navigate to project root, then to Frontend directory
-    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    SCRIPT_DIR="$(realpath "$(dirname "$0")")"
     PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
     cd "$PROJECT_ROOT/Frontend"
     
@@ -262,7 +272,7 @@ clean_cache() {
     log_info "Cleaning cache and temporary files..."
     
     # Navigate to project root
-    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    SCRIPT_DIR="$(realpath "$(dirname "$0")")"
     PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
     cd "$PROJECT_ROOT"
     

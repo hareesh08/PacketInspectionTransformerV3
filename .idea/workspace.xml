@@ -4,11 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="8841923a-3a8c-410b-8e39-f8f2178fb268" name="Changes" comment="CICD development">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/deploy/install-deps.sh" beforeDir="false" afterPath="$PROJECT_DIR$/deploy/install-deps.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/deploy/start.sh" beforeDir="false" afterPath="$PROJECT_DIR$/deploy/start.sh" afterDir="false" />
-    </list>
+    <list default="true" id="8841923a-3a8c-410b-8e39-f8f2178fb268" name="Changes" comment="NEW CICD development" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -103,7 +99,7 @@
       <workItem from="1767990399675" duration="930000" />
       <workItem from="1767991499074" duration="56000" />
       <workItem from="1768033995084" duration="4927000" />
-      <workItem from="1768039709934" duration="4760000" />
+      <workItem from="1768039709934" duration="5063000" />
     </task>
     <task id="LOCAL-00001" summary="updated ui,notification, deployment">
       <option name="closed" value="true" />
@@ -409,7 +405,15 @@
       <option name="project" value="LOCAL" />
       <updated>1768047135525</updated>
     </task>
-    <option name="localTasksCounter" value="39" />
+    <task id="LOCAL-00039" summary="NEW CICD development">
+      <option name="closed" value="true" />
+      <created>1768047480828</created>
+      <option name="number" value="00039" />
+      <option name="presentableId" value="LOCAL-00039" />
+      <option name="project" value="LOCAL" />
+      <updated>1768047480828</updated>
+    </task>
+    <option name="localTasksCounter" value="40" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -432,7 +436,8 @@
     <MESSAGE value="Recoded all three GitHub Actions workflows for LFS and Docker cloud deployment:&#10;&#10;ci.yml - Continuous Integration with LFS support:&#10;&#10;Proper LFS checkout and pull for model files&#10;Backend testing with model verification&#10;Frontend linting and building&#10;Security scanning with Trivy&#10;Docker build verification with matrix strategy&#10;Python code quality checks (Black, isort, Flake8)&#10;cd.yml - Continuous Deployment to cloud:&#10;&#10;LFS model integration in Docker builds&#10;Multi-platform Docker image builds (linux/amd64)&#10;Push to GitHub Container Registry (ghcr.io)&#10;SSH-based deployment to cloud servers&#10;Health checks for backend and frontend&#10;Automatic changelog generation&#10;GitHub release creation with Docker image tags&#10;Rollback capability via workflow_dispatch&#10;model.yml - LFS Model Management:&#10;&#10;Upload models to GitHub Releases&#10;Download models from releases&#10;Model integrity verification with SHA256&#10;PyTorch model load testing&#10;Automatic Docker rebuild on model updates&#10;Proper LFS file handling throughout&#10;All workflows are optimized for Git LFS, include proper error handling, and support cloud deployment scenarios." />
     <MESSAGE value="fix cd" />
     <MESSAGE value="CICD development" />
-    <option name="LAST_COMMIT_MESSAGE" value="CICD development" />
+    <MESSAGE value="NEW CICD development" />
+    <option name="LAST_COMMIT_MESSAGE" value="NEW CICD development" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/PacketInspectionTransformerV3$run.coverage" NAME="run Coverage Results" MODIFIED="1767938496545" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />

@@ -47,10 +47,27 @@ apt install -y curl wget git htop unzip software-properties-common
 log_info "Installing Python 3 and pip..."
 apt install -y python3 python3-pip python3-venv python3-dev
 
-# Install Node.js 18.x
-log_info "Installing Node.js 18.x..."
-curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-apt install -y nodejs
+# Install NVM and Node.js
+log_info "Installing NVM and Node.js..."
+
+# Install NVM
+log_info "Installing NVM..."
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
+
+# Source NVM to make it available in current session
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+
+# Install latest LTS Node.js
+log_info "Installing Node.js LTS..."
+nvm install --lts
+nvm use --lts
+nvm alias default lts/*
+
+# Verify installation
+log_info "Node.js version: $(node -v)"
+log_info "NPM version: $(npm -v)"
 
 # Install nginx
 log_info "Installing nginx..."
@@ -89,3 +106,5 @@ echo
 echo "Next steps:"
 echo "1. Run: sudo ./start.sh fresh"
 echo "2. Or manually install project dependencies with Python and Node.js"
+echo
+echo "Note: You may need to restart your terminal or run 'source ~/.bashrc' to use NVM in new sessions."

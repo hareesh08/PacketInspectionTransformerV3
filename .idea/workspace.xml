@@ -6,9 +6,8 @@
   <component name="ChangeListManager">
     <list default="true" id="8841923a-3a8c-410b-8e39-f8f2178fb268" name="Changes" comment="CICD development">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Frontend/.env" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/.env" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Frontend/src/lib/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/src/lib/api.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/setup.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/deploy/install-deps.sh" beforeDir="false" afterPath="$PROJECT_DIR$/deploy/install-deps.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/deploy/start.sh" beforeDir="false" afterPath="$PROJECT_DIR$/deploy/start.sh" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -104,7 +103,7 @@
       <workItem from="1767990399675" duration="930000" />
       <workItem from="1767991499074" duration="56000" />
       <workItem from="1768033995084" duration="4927000" />
-      <workItem from="1768039709934" duration="3705000" />
+      <workItem from="1768039709934" duration="4760000" />
     </task>
     <task id="LOCAL-00001" summary="updated ui,notification, deployment">
       <option name="closed" value="true" />
@@ -394,7 +393,23 @@
       <option name="project" value="LOCAL" />
       <updated>1768041616721</updated>
     </task>
-    <option name="localTasksCounter" value="37" />
+    <task id="LOCAL-00037" summary="CICD development">
+      <option name="closed" value="true" />
+      <created>1768046013599</created>
+      <option name="number" value="00037" />
+      <option name="presentableId" value="LOCAL-00037" />
+      <option name="project" value="LOCAL" />
+      <updated>1768046013599</updated>
+    </task>
+    <task id="LOCAL-00038" summary="CICD development">
+      <option name="closed" value="true" />
+      <created>1768047135525</created>
+      <option name="number" value="00038" />
+      <option name="presentableId" value="LOCAL-00038" />
+      <option name="project" value="LOCAL" />
+      <updated>1768047135525</updated>
+    </task>
+    <option name="localTasksCounter" value="39" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

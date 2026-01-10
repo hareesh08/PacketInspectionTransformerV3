@@ -28,6 +28,13 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Helper function to source NVM
+source_nvm() {
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+}
+
 # Logging functions
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -60,26 +67,52 @@ install_system_deps() {
     apt update && apt upgrade -y
     
     # Install Python and pip
-    apt install -y python3 python3-pip python3-venv
+    apt install -y python3 python3-pip python3-venv python3-dev
     
-    # Install Node.js 18.x
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-    apt install -y nodejs
+    # Install NVM and Node.js
+    install_nodejs_with_nvm
     
     # Install nginx
     apt install -y nginx
     
     # Install other utilities
-    apt install -y curl wget git htop
+    apt install -y curl wget git htop unzip software-properties-common
     
     log_success "System dependencies installed"
+}
+
+# Install Node.js using NVM
+install_nodejs_with_nvm() {
+    log_info "Installing Node.js using NVM..."
+    
+    # Install NVM (latest version)
+    log_info "Installing NVM..."
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+    
+    # Source NVM to make it available in current session
+    source_nvm
+    
+    # Install latest LTS Node.js
+    log_info "Installing Node.js LTS..."
+    nvm install --lts
+    nvm use --lts
+    nvm alias default lts/*
+    
+    # Verify installation
+    log_info "Node.js version: $(node -v)"
+    log_info "NPM version: $(npm -v)"
+    
+    log_success "Node.js installed successfully via NVM"
 }
 
 # Install Python dependencies
 install_python_deps() {
     log_info "Installing Python dependencies..."
     
-    cd "$(dirname "$0")/.."
+    # Navigate to project root
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+    cd "$PROJECT_ROOT"
     
     # Create virtual environment if it doesn't exist
     if [ ! -d "venv" ]; then
@@ -99,13 +132,18 @@ install_python_deps() {
 install_node_deps() {
     log_info "Installing Node.js dependencies..."
     
-    cd "$(dirname "$0")/.."
-    cd Frontend
+    # Source NVM to ensure Node.js is available
+    source_nvm
+    
+    # Navigate to project root, then to Frontend directory
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+    cd "$PROJECT_ROOT/Frontend"
     
     # Install dependencies
     npm install
     
-    # Install global serve package for production
+    # Install global packages
     npm install -g serve pm2
     
     log_success "Node.js dependencies installed"
@@ -115,8 +153,13 @@ install_node_deps() {
 build_frontend() {
     log_info "Building frontend..."
     
-    cd "$(dirname "$0")/.."
-    cd Frontend
+    # Source NVM to ensure Node.js is available
+    source_nvm
+    
+    # Navigate to project root, then to Frontend directory
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+    cd "$PROJECT_ROOT/Frontend"
     
     # Build for production
     npm run build
@@ -147,7 +190,10 @@ setup_nginx() {
 start_backend() {
     log_info "Starting backend service..."
     
-    cd "$(dirname "$0")/.."
+    # Navigate to project root
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+    cd "$PROJECT_ROOT"
     
     # Create necessary directories
     mkdir -p logs data model
@@ -172,8 +218,13 @@ start_backend() {
 start_frontend() {
     log_info "Starting frontend service..."
     
-    cd "$(dirname "$0")/.."
-    cd Frontend
+    # Source NVM to ensure Node.js is available
+    source_nvm
+    
+    # Navigate to project root, then to Frontend directory
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+    cd "$PROJECT_ROOT/Frontend"
     
     # Start frontend with PM2 (serve the built files)
     pm2 start "serve -s dist -l 3000" --name "malware-frontend" || pm2 restart malware-frontend
@@ -210,7 +261,10 @@ stop_services() {
 clean_cache() {
     log_info "Cleaning cache and temporary files..."
     
-    cd "$(dirname "$0")/.."
+    # Navigate to project root
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+    cd "$PROJECT_ROOT"
     
     # Clean Python cache
     find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
@@ -223,7 +277,7 @@ clean_cache() {
     rm -rf dist 2>/dev/null || true
     
     # Clean logs
-    cd ..
+    cd "$PROJECT_ROOT"
     rm -rf logs/*.log 2>/dev/null || true
     
     # Clean PM2 logs

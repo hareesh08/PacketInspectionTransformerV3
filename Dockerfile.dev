@@ -1,40 +1,57 @@
-# ============================================================================
+# =============================================================================
 # Packet Inspection Transformer - Development Dockerfile
-# ============================================================================
-# Features: Hot reload, debug mode, volume mounts for development
+# =============================================================================
+# Development image with hot-reload support and debugging tools
+# =============================================================================
 
-FROM python:3.12-slim
-
-WORKDIR /app
+FROM python:3.11-slim-bookworm
 
 # Install development dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     vim \
-    procps \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY requirements.txt .
+# Set working directory
+WORKDIR /app
 
-# Install Python dependencies with dev extras
+# Copy requirements and install dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Create non-root user
-RUN useradd -m devuser && chown -R devuser:devuser /app
-USER devuser
+# Install development tools
+RUN pip install --no-cache-dir \
+    pytest \
+    pytest-asyncio \
+    pytest-cov \
+    httpx
 
-# Set development environment variables
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
+# Copy application code
+COPY app.py .
+COPY settings.py .
+COPY models.py .
+COPY detector.py .
+COPY threat_manager.py .
+COPY database.py .
+COPY config/ ./config/
+COPY model/ ./model/
+
+# Create directories
+RUN mkdir -p /app/logs /app/data
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    ENVIRONMENT=development \
     DEBUG=true
 
-# Expose ports
-EXPOSE 8000
+# Expose port
+EXPOSE 8000 5678
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
-# Start with uvicorn reload for development
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Default command with hot-reload
+CMD ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app", "--log-level", "debug"]

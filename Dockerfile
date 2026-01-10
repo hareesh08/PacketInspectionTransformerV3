@@ -1,91 +1,103 @@
-# ============================================================================
-# Packet Inspection Transformer - Multi-Stage Production Dockerfile
-# ============================================================================
+# =============================================================================
+# Packet Inspection Transformer - Main Application Dockerfile
+# =============================================================================
+# Production-ready Docker image for the malware detection backend
+# =============================================================================
 
-# ----------------------------------------------------------------------------
-# Build Stage: Install Python dependencies
-# ----------------------------------------------------------------------------
-FROM python:3.12-slim AS builder
+# -----------------------------------------------------------------------------
+# Stage 1: Builder - Install build dependencies
+# -----------------------------------------------------------------------------
+FROM python:3.11-slim-bookworm AS builder
 
 WORKDIR /build
 
-# Install build dependencies
+# Install system dependencies for PyTorch
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
+    build-essential \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install dependencies in isolated location
+# Download and install PyTorch with CUDA support (if available)
+# Note: For CPU-only, use cpu tag or remove --index-url
+ARG PYTORCH_VERSION=2.1.0
+ARG CUDA_VERSION=12.1
+
+# Install PyTorch
+RUN pip download --no-deps \
+    "torch==${PYTORCH_VERSION}" \
+    "torchvision==0.16.0" \
+    --platform manylinux_2014_x86_64 --only-binary=:all: \
+    -f https://download.pytorch.org/whl/torch_stable.html || \
+    pip install "torch==${PYTORCH_VERSION}" --index-url https://download.pytorch.org/whl/cu${CUENCY} || \
+    pip install "torch==${PYTORCH_VERSION}"
+
+# Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# ----------------------------------------------------------------------------
-# Model Download Stage
-# ----------------------------------------------------------------------------
-FROM builder AS model-downloader
+# -----------------------------------------------------------------------------
+# Stage 2: Production - Minimal runtime image
+# -----------------------------------------------------------------------------
+FROM python:3.11-slim-bookworm AS production
 
-WORKDIR /model
+# Security: Create non-root user
+ARG APP_USER=appuser
+ARG APP_UID=1000
 
-# Model configuration
-ARG MODEL_VERSION="latest"
-ARG GITHUB_REPOSITORY=""
-ENV MODEL_PATH="model/finetuned_best_model.pth"
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Download model from GitHub releases (if available)
-RUN if [ -n "${GITHUB_REPOSITORY}" ] && [ "${MODEL_VERSION}" != "none" ]; then \
-    echo "Downloading model version ${MODEL_VERSION} from ${GITHUB_REPOSITORY}..." && \
-    MODEL_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/model-${MODEL_VERSION}/finetuned_best_model.pth" && \
-    curl -L -o ${MODEL_PATH} \
-      -H "Accept: application/octet-stream" \
-      "${MODEL_URL}" || echo "Model download failed, will use fallback"; \
-  else \
-    echo "No model download configured, will use local copy"; \
-  fi
+# Create user with specific UID/GID for security
+RUN groupadd --gid ${APP_UID} ${APP_USER} 2>/dev/null || true
+RUN useradd --uid ${APP_UID} --gid ${APP_UID} --create-home --shell /bin/bash ${APP_USER} 2>/dev/null || true
 
-# ----------------------------------------------------------------------------
-# Runtime Stage: Minimal production image
-# ----------------------------------------------------------------------------
-FROM python:3.12-slim AS runtime
-
+# Set working directory
 WORKDIR /app
 
 # Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    APP_USER=${APP_USER} \
+    APP_UID=${APP_UID}
 
-# Copy installed Python packages from builder
-COPY --from=builder /install /usr/local
+# Copy application code from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Install minimal runtime dependencies only
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Copy application files
+COPY --chown=${APP_USER}:${APP_USER} app.py .
+COPY --chown=${APP_USER}:${APP_USER} settings.py .
+COPY --chown=${APP_USER}:${APP_USER} models.py .
+COPY --chown=${APP_USER}:${APP_USER} detector.py .
+COPY --chown=${APP_USER}:${APP_USER} threat_manager.py .
+COPY --chown=${APP_USER}:${APP_USER} database.py .
+COPY --chown=${APP_USER}:${APP_USER} config/ ./config/
+COPY --chown=${APP_USER}:${APP_USER} model/ ./model/
 
-# Copy application code
-COPY --chown=appuser:appuser . .
+# Create directories for logs and data
+RUN mkdir -p /app/logs /app/data /app/certificates && \
+    chown -R ${APP_USER}:${APP_USER} /app
 
-# Ensure model directory exists
-RUN mkdir -p /app/model
+# Switch to non-root user
+USER ${APP_USER}
 
-# Copy model file if it doesn't exist in the copied application code
-# Model should be included via LFS during build context
-RUN if [ ! -f /app/model/finetuned_best_model.pth ]; then \
-    echo "WARNING: Model file not found in build context"; \
-  else \
-    echo "Model file found: $(ls -lh /app/model/finetuned_best_model.pth)"; \
-  fi
-
-# Create non-root user
-RUN useradd -m appuser && chown -R appuser:appuser /app
-USER appuser
-
-# Expose port
+# Expose port (default for uvicorn)
 EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
-# Start the application
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Default command
+CMD ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+
+# Labels for container metadata
+LABEL maintainer="security-team" \
+      version="1.0.0" \
+      description="Real-Time Malware Detection Gateway" \
+      org.opencontainers.image.source="https://github.com/your-org/packet-inspection-transformer"

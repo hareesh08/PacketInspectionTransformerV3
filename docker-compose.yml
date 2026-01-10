@@ -1,91 +1,212 @@
-# ============================================================================
+# =============================================================================
 # Packet Inspection Transformer - Production Docker Compose
-# ============================================================================
-# Usage:
-#   Production: docker compose --profile prod up -d
-#   Development: docker compose --profile dev up -d
-#   All services: docker compose up -d
-# ============================================================================
+# =============================================================================
+# Production-ready deployment configuration with Nginx reverse proxy,
+# automatic SSL certificate generation, and scaling support
+# =============================================================================
 
 services:
-  # ----------------------------------------------------------------------------
-  # Backend API Service (Production)
-  # ----------------------------------------------------------------------------
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: packet-inspection-backend
-    restart: unless-stopped
-    profiles: [prod]
-    ports:
-      - "${API_PORT:-8000}:8000"
-    volumes:
-      - ./model:/app/model:ro
-      - ./logs:/app/logs
-    environment:
-      - PYTHONPATH=/app
-      - HOST=0.0.0.0
-      - PORT=8000
-      - MALWARE_DETECTOR_DEBUG=false
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    networks:
-      - app-network
-
-  # ----------------------------------------------------------------------------
-  # Frontend Service (Production)
-  # ----------------------------------------------------------------------------
+  # -----------------------------------------------------------------------------
+  # Frontend Service - React application served by Nginx
+  # -----------------------------------------------------------------------------
   frontend:
     build:
       context: .
       dockerfile: Frontend/Dockerfile
-    container_name: packet-inspection-frontend
+    container_name: pit-frontend
     restart: unless-stopped
-    profiles: [prod]
     ports:
-      - "${WEB_PORT:-80}:80"
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Mount nginx configuration
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d/:/etc/nginx/conf.d/:ro
+      # Mount SSL certificates (populated by certbot)
+      - ./nginx/certificates:/etc/nginx/certificates:ro
+    environment:
+      - NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx/conf.d
     depends_on:
       backend:
         condition: service_healthy
-    networks:
-      - app-network
-
-  # ----------------------------------------------------------------------------
-  # Development Service (Hot Reload)
-  # ----------------------------------------------------------------------------
-  dev:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    container_name: packet-inspection-dev
-    restart: unless-stopped
-    profiles: [dev]
-    ports:
-      - "${DEV_PORT:-8001}:8000"
-    volumes:
-      - .:/app
-      - ./model:/app/model:ro
-      - ./logs:/app/logs
-    environment:
-      - PYTHONPATH=/app
-      - HOST=0.0.0.0
-      - PORT=8000
-      - MALWARE_DETECTOR_DEBUG=true
-      - DEBUG=true
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
     networks:
-      - app-network
+      - pit-network
+    # Enable for scaling (see scaling section below)
+    # deploy:
+    #   replicas: 2
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN:-localhost}`)"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
 
+  # -----------------------------------------------------------------------------
+  # Backend Service - FastAPI application
+  # -----------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pit-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount application configuration
+      - ./config:/app/config:ro
+      # Mount model file (if not included in build)
+      - ./model:/app/model:ro
+      # Persist logs
+      - ./logs:/app/logs
+      # Persist database
+      - ./data:/app/data
+      # Persist certificates
+      - ./certs:/app/certificates
+    environment:
+      # Application Settings
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - LOG_LEVEL=info
+      
+      # Server Settings
+      - HOST=0.0.0.0
+      - PORT=8000
+      - WORKERS=2
+      
+      # Model Settings
+      - MODEL_PATH=/app/model/finetuned_best_model.pth
+      - VOCAB_SIZE=30000
+      - D_MODEL=256
+      - NHEAD=8
+      - NUM_LAYERS=6
+      - DIM_FEEDFORWARD=1024
+      - DROPOUT=0.1
+      
+      # Detection Settings
+      - CONFIDENCE_THRESHOLD=0.85
+      - MAX_FILE_SIZE=104857600
+      - CHUNK_SIZE=1024
+      - WINDOW_SIZE=512
+      - TEMPERATURE=1.0
+      
+      # Early Termination Settings
+      - EARLY_TERMINATION_ENABLED=false
+      - EARLY_TERMINATION_THRESHOLD=0.95
+      - EARLY_TERMINATION_MIN_BYTES=1024
+      
+      # Database Settings
+      - DATABASE_PATH=/app/data/threats.db
+      
+      # Security Settings
+      - FORCE_GPU=false
+      
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - pit-network
+    # Enable for GPU support
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`${DOMAIN:-localhost}`) && PathPrefix `/api`"
+      - "traefik.http.services.backend.loadbalancer.server.port=8000"
+
+  # -----------------------------------------------------------------------------
+  # Certbot Service - SSL certificate management
+  # -----------------------------------------------------------------------------
+  certbot:
+    image: certbot/certbot:latest
+    container_name: pit-certbot
+    restart: unless-stopped
+    volumes:
+      # Mount nginx configuration
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d/:/etc/nginx/conf.d/:ro
+      # Mount certificates directory
+      - ./nginx/certificates:/etc/letsencrypt:rw
+      # Mount webroot for domain verification
+      - ./nginx/html:/var/www/html:ro
+    environment:
+      - TERM=xterm
+    entrypoint: /bin/sh
+    command: >
+      -c "while true; do
+        certbot certonly --webroot -w /var/www/html
+        -d ${DOMAIN:-localhost}
+        --email ${LETSENCRYPT_EMAIL:-admin@example.com}
+        --agree-tos --non-interactive
+        || echo 'Certificate generation failed or already exists';
+        sleep 86400;
+      done"
+    networks:
+      - pit-network
+
+  # -----------------------------------------------------------------------------
+  # Optional: Traefik for load balancing and routing
+  # Uncomment to enable Traefik as the entry point
+  # -----------------------------------------------------------------------------
+  # traefik:
+  #   image: traefik:v3.0
+  #   container_name: pit-traefik
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #     - "443:443/udp"
+  #   volumes:
+  #     - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+  #     - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+  #     - ./traefik/certificates:/certificates:ro
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #   networks:
+  #     - pit-network
+  #   labels:
+  #     - "traefik.enable=true"
+
+# -----------------------------------------------------------------------------
+# Networks
+# -----------------------------------------------------------------------------
 networks:
-  app-network:
-    name: packet-inspection-network
+  pit-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+
+# -----------------------------------------------------------------------------
+# Volumes for persistent data
+# -----------------------------------------------------------------------------
+volumes:
+  app-logs:
+  app-data:
+  certificates:
+
+# -----------------------------------------------------------------------------
+# Scalability Configuration
+# -----------------------------------------------------------------------------
+# To enable horizontal scaling:
+# 1. Uncomment the deploy sections for frontend and backend
+# 2. Add a load balancer (Traefik, Nginx, or cloud load balancer)
+# 3. Set up a shared database (PostgreSQL, Redis for sessions)
+# 4. Configure sticky sessions if needed
+#
+# Example docker stack deploy for swarm mode:
+# docker stack deploy -c docker-compose.yml pit-stack
+#
+# For Kubernetes, use the provided k8s/ directory

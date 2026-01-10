@@ -1,0 +1,441 @@
+#!/bin/bash
+
+# =============================================================================
+# Packet Inspection Transformer - Automated Deployment Script
+# =============================================================================
+# Fully automatic deployment for production environments
+# Supports access via https://<vmip> with self-signed SSL certificates
+# =============================================================================
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Configuration
+SCRIPT_VERSION="1.0.0"
+PROJECT_NAME="Packet Inspection Transformer"
+CONTAINER_PREFIX="pit"
+VM_IP=""
+
+# Functions
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Check if running as root
+check_root() {
+    if [[ $EUID -ne 0 ]]; then
+        log_warning "Not running as root. Some operations may require sudo."
+        SUDO="sudo"
+    else
+        SUDO=""
+    fi
+}
+
+# Detect VM IP address
+detect_vm_ip() {
+    log_info "Detecting VM IP address..."
+    
+    # Try multiple methods to detect IP
+    if command -v ip &> /dev/null; then
+        VM_IP=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[0-9.]+' | head -1)
+    fi
+    
+    if [[ -z "$VM_IP" ]]; then
+        VM_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+    fi
+    
+    if [[ -z "$VM_IP" ]]; then
+        VM_IP=$(curl -s ifconfig.me 2>/dev/null || echo "")
+    fi
+    
+    if [[ -z "$VM_IP" ]]; then
+        VM_IP="localhost"
+        log_warning "Could not detect VM IP. Using 'localhost'"
+    fi
+    
+    log_success "Detected VM IP: $VM_IP"
+}
+
+# Check prerequisites
+check_prerequisites() {
+    log_info "Checking prerequisites..."
+    
+    local missing_deps=()
+    
+    # Check Docker
+    if ! command -v docker &> /dev/null; then
+        log_error "Docker is not installed"
+        missing_deps+=("docker")
+    else
+        log_success "Docker is installed: $(docker --version)"
+    fi
+    
+    # Check Docker Compose
+    if ! command -v docker compose &> /dev/null && ! command -v docker-compose &> /dev/null; then
+        log_error "Docker Compose is not installed"
+        missing_deps+=("docker-compose")
+    else
+        local compose_version=$(docker compose version 2>/dev/null || docker-compose --version 2>/dev/null)
+        log_success "Docker Compose is installed: $compose_version"
+    fi
+    
+    # Check Git
+    if ! command -v git &> /dev/null; then
+        log_warning "Git is not installed"
+    else
+        log_success "Git is installed: $(git --version)"
+    fi
+    
+    # Check OpenSSL
+    if ! command -v openssl &> /dev/null; then
+        log_error "OpenSSL is not installed"
+        missing_deps+=("openssl")
+    else
+        log_success "OpenSSL is installed: $(openssl version)"
+    fi
+    
+    # Check curl
+    if ! command -v curl &> /dev/null; then
+        log_warning "curl is not installed"
+    fi
+    
+    if [[ ${#missing_deps[@]} -gt 0 ]]; then
+        log_error "Missing dependencies: ${missing_deps[*]}"
+        log_info "Please install the missing dependencies and run this script again."
+        exit 1
+    fi
+    
+    # Check Docker daemon
+    if ! docker info &> /dev/null; then
+        log_error "Docker daemon is not running or you don't have permission to access it."
+        log_info "Please start Docker and add your user to the docker group:"
+        log_info "  sudo systemctl start docker"
+        log_info "  sudo usermod -aG docker \$USER"
+        exit 1
+    fi
+    
+    log_success "All prerequisites are met"
+}
+
+# Stop existing containers
+stop_existing_containers() {
+    log_info "Stopping existing containers..."
+    
+    # Stop containers if they exist
+    docker compose down 2>/dev/null || true
+    
+    # Remove any orphaned containers
+    for container in $(docker ps -aq --filter "name=${CONTAINER_PREFIX}-" 2>/dev/null); do
+        log_info "Removing container: $container"
+        docker rm -f "$container" 2>/dev/null || true
+    done
+    
+    log_success "Existing containers cleaned up"
+}
+
+# Create required directories
+create_directories() {
+    log_info "Creating required directories..."
+    
+    mkdir -p nginx/certificates
+    mkdir -p nginx/html
+    mkdir -p logs
+    mkdir -p data
+    mkdir -p model
+    mkdir -p config
+    
+    log_success "Directories created"
+}
+
+# Generate SSL certificates
+generate_ssl_certificates() {
+    log_info "Generating SSL certificates for IP: $VM_IP"
+    
+    local cert_dir="nginx/certificates"
+    local cert_file="${cert_dir}/fullchain.pem"
+    local key_file="${cert_dir}/privkey.pem"
+    
+    # Create directories for certificates
+    mkdir -p "${cert_dir}/live/${VM_IP}"
+    mkdir -p "${cert_dir}/archive"
+    
+    # Generate self-signed certificate
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+        -keyout "${key_file}" \
+        -out "${cert_file}" \
+        -subj "/C=US/ST=State/L=City/O=${PROJECT_NAME}/CN=${VM_IP}" \
+        -addext "subjectAltName=IP:${VM_IP},DNS:${VM_IP}" \
+        2>/dev/null
+    
+    # Also create symlinks for Let's Encrypt style paths
+    mkdir -p "${cert_dir}/live/${VM_IP}"
+    ln -sf "${cert_file}" "${cert_dir}/live/${VM_IP}/fullchain.pem" 2>/dev/null || true
+    ln -sf "${key_file}" "${cert_dir}/live/${VM_IP}/privkey.pem" 2>/dev/null || true
+    ln -sf "${cert_file}" "${cert_dir}/live/${VM_IP}/chain.pem" 2>/dev/null || true
+    
+    # Set permissions
+    chmod 600 "${key_file}"
+    chmod 644 "${cert_file}"
+    
+    log_success "SSL certificates generated"
+    log_info "Certificate location: ${cert_dir}/"
+}
+
+# Update nginx configuration for IP-based access
+update_nginx_config() {
+    log_info "Updating Nginx configuration for IP-based access..."
+    
+    local conf_file="nginx/conf.d/default.conf"
+    
+    # Replace ${DOMAIN:-localhost} with VM_IP in the nginx config
+    if [[ -f "$conf_file" ]]; then
+        sed -i "s/\${DOMAIN:-localhost}/${VM_IP}/g" "$conf_file"
+        log_success "Nginx configuration updated"
+    else
+        log_error "Nginx configuration file not found: $conf_file"
+        exit 1
+    fi
+}
+
+# Create environment file
+create_env_file() {
+    log_info "Creating environment configuration..."
+    
+    if [[ ! -f ".env" ]]; then
+        if [[ -f ".env.example" ]]; then
+            cp ".env.example" ".env"
+        fi
+    fi
+    
+    # Update .env with VM_IP
+    if [[ -f ".env" ]]; then
+        # Update DOMAIN to use VM_IP
+        sed -i "s/^DOMAIN=.*/DOMAIN=${VM_IP}/g" ".env"
+        
+        # Update VITE_API_URL
+        sed -i "s|^VITE_API_URL=.*|VITE_API_URL=https://${VM_IP}|g" ".env"
+        
+        # Update LETSENCRYPT_EMAIL (use a placeholder for self-signed)
+        sed -i "s|^LETSENCRYPT_EMAIL=.*|LETSENCRYPT_EMAIL=admin@${VM_IP}|g" ".env"
+        
+        log_success "Environment file updated"
+    fi
+}
+
+# Build and start containers
+deploy_containers() {
+    log_info "Building and starting containers..."
+    
+    # Set environment variables for build
+    export DOMAIN="${VM_IP}"
+    
+    # Build the images
+    log_info "Building Docker images..."
+    docker compose build --no-cache
+    
+    # Start the services
+    log_info "Starting services..."
+    docker compose up -d
+    
+    log_success "Containers deployed"
+}
+
+# Wait for services to be healthy
+wait_for_services() {
+    log_info "Waiting for services to be healthy..."
+    
+    local max_attempts=60
+    local attempt=0
+    local backend_healthy=false
+    local frontend_healthy=false
+    
+    while [[ $attempt -lt $max_attempts ]]; do
+        attempt=$((attempt + 1))
+        
+        # Check backend health
+        if ! $backend_healthy; then
+            if curl -sf http://localhost:8000/health &>/dev/null; then
+                log_success "Backend is healthy"
+                backend_healthy=true
+            fi
+        fi
+        
+        # Check frontend health (basic nginx check)
+        if ! $frontend_healthy; then
+            if curl -sf http://localhost:80/health &>/dev/null || curl -sf http://localhost/ &>/dev/null; then
+                log_success "Frontend is healthy"
+                frontend_healthy=true
+            fi
+        fi
+        
+        if $backend_healthy && $frontend_healthy; then
+            break
+        fi
+        
+        log_info "Waiting for services... (attempt $attempt/$max_attempts)"
+        sleep 2
+    done
+    
+    if ! $backend_healthy; then
+        log_warning "Backend may not be fully healthy yet"
+    fi
+    
+    if ! $frontend_healthy; then
+        log_warning "Frontend may not be fully healthy yet"
+    fi
+    
+    log_success "Service health check completed"
+}
+
+# Configure firewall
+configure_firewall() {
+    log_info "Configuring firewall..."
+    
+    # Check if ufw is available
+    if command -v ufw &> /dev/null; then
+        log_info "Configuring UFW firewall..."
+        $SUDO ufw allow 80/tcp comment 'HTTP' 2>/dev/null || true
+        $SUDO ufw allow 443/tcp comment 'HTTPS' 2>/dev/null || true
+        $SUDO ufw allow 22/tcp comment 'SSH' 2>/dev/null || true
+        
+        # Enable UFW if not already enabled
+        if ! $SUDO ufw status | grep -q "Status: active"; then
+            log_warning "UFW is not active. Enabling..."
+            echo "y" | $SUDO ufw enable 2>/dev/null || true
+        fi
+        
+        log_success "UFW configured"
+    elif command -v firewall-cmd &> /dev/null; then
+        log_info "Configuring firewalld..."
+        $SUDO firewall-cmd --permanent --add-service=http 2>/dev/null || true
+        $SUDO firewall-cmd --permanent --add-service=https 2>/dev/null || true
+        $SUDO firewall-cmd --reload 2>/dev/null || true
+        log_success "firewalld configured"
+    elif command -v iptables &> /dev/null; then
+        log_info "Configuring iptables..."
+        $SUDO iptables -C INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || \
+            $SUDO iptables -I INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || true
+        $SUDO iptables -C INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || \
+            $SUDO iptables -I INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || true
+        log_success "iptables configured"
+    else
+        log_warning "No supported firewall found. Please configure firewall manually."
+    fi
+}
+
+# Print deployment summary
+print_summary() {
+    echo ""
+    echo "============================================================================="
+    echo "                    ${GREEN}DEPLOYMENT COMPLETE${NC}"
+    echo "============================================================================="
+    echo ""
+    echo -e "${BLUE}Access your application:${NC}"
+    echo ""
+    echo "  HTTPS:  ${GREEN}https://${VM_IP}${NC}"
+    echo ""
+    echo -e "${BLUE}Service Endpoints:${NC}"
+    echo ""
+    echo "  Frontend:  http://localhost:80 (HTTP redirect to HTTPS)"
+    echo "  Backend:   http://localhost:8000"
+    echo "  Health:    https://${VM_IP}/health"
+    echo "  API:       https://${VM_IP}/api/"
+    echo ""
+    echo -e "${BLUE}Useful Commands:${NC}"
+    echo ""
+    echo "  View logs:    docker compose logs -f"
+    echo "  Stop:         docker compose down"
+    echo "  Restart:      docker compose restart"
+    echo "  Status:       docker compose ps"
+    echo ""
+    echo -e "${BLUE}Note:${NC}"
+    echo ""
+    echo "  - Self-signed SSL certificate has been generated"
+    echo "  - Accept the certificate warning in your browser"
+    echo "  - For production, consider using Let's Encrypt with a domain"
+    echo ""
+    echo "============================================================================="
+}
+
+# Verify deployment
+verify_deployment() {
+    log_info "Verifying deployment..."
+    
+    local all_healthy=true
+    
+    # Check if containers are running
+    local running_containers=$(docker ps --filter "name=${CONTAINER_PREFIX}-" -q | wc -l)
+    log_info "Running containers: $running_containers"
+    
+    if [[ "$running_containers" -lt 2 ]]; then
+        log_warning "Expected at least 2 containers (frontend, backend)"
+        all_healthy=false
+    fi
+    
+    # Test HTTPS endpoint
+    if command -v curl &> /dev/null; then
+        local https_response=$(curl -sfk https://${VM_IP}/health 2>&1 || echo "FAILED")
+        if [[ "$https_response" != "FAILED" ]]; then
+            log_success "HTTPS endpoint is responding"
+            echo "Response: $https_response"
+        else
+            log_warning "HTTPS endpoint may not be responding yet"
+            all_healthy=false
+        fi
+    fi
+    
+    if $all_healthy; then
+        log_success "Deployment verified successfully"
+        return 0
+    else
+        log_warning "Some services may need more time to start"
+        return 1
+    fi
+}
+
+# Main execution
+main() {
+    echo ""
+    echo "============================================================================="
+    echo "      ${GREEN}${PROJECT_NAME} - Automated Deployment Script${NC}"
+    echo "                      Version: ${SCRIPT_VERSION}"
+    echo "============================================================================="
+    echo ""
+    
+    check_root
+    detect_vm_ip
+    check_prerequisites
+    stop_existing_containers
+    create_directories
+    generate_ssl_certificates
+    update_nginx_config
+    create_env_file
+    deploy_containers
+    wait_for_services
+    configure_firewall
+    
+    echo ""
+    verify_deployment
+    print_summary
+}
+
+# Run main function
+main "$@"

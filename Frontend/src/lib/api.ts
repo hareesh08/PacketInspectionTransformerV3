@@ -26,23 +26,27 @@ function getApiBaseUrl(): string {
     return `http://localhost:${port}`;
   }
   
-  // Production: use same host with configured port
-  const port = import.meta.env.VITE_API_PORT || '8000';
-  const { hostname, protocol } = window.location;
-  return `${protocol}//${hostname}:${port}`;
+  // Production with nginx proxy: use relative URLs
+  return '/api';
 }
 
-// Get WebSocket URL for SSE connections (same-origin, goes through Nginx)
-function getWebSocketUrl(): string {
-  // Use same-origin approach - WebSocket connects through Nginx proxy
-  const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  // location.host includes port if non-standard, works for both dev and prod
-  return `${protocol}://${location.host}`;
+// Get SSE URL for Server-Sent Events connections (uses HTTP/HTTPS, not WebSocket)
+function getSSEUrl(): string {
+  // For SSE, we use HTTP/HTTPS protocol, not WebSocket
+  const apiUrl = getApiBaseUrl();
+  
+  // If using relative URLs (nginx proxy), return relative path
+  if (apiUrl.startsWith('/')) {
+    return '';  // Empty base for relative URLs
+  }
+  
+  // For absolute URLs, return the base URL
+  return apiUrl;
 }
 
 // API Base URL - configurable via environment variable
 const API_BASE_URL = getApiBaseUrl();
-const WS_BASE_URL = getWebSocketUrl();
+const SSE_BASE_URL = getSSEUrl();
 
 // Request timeout in milliseconds (increased for large file scans)
 const REQUEST_TIMEOUT = 300000; // 5 minutes
@@ -327,7 +331,7 @@ class ApiClient {
     onMessage: (notification: Notification) => void,
     onError?: (error: Event) => void
   ): EventSource {
-    const eventSource = new EventSource(`${WS_BASE_URL}/notifications/stream`);
+    const eventSource = new EventSource(`${SSE_BASE_URL}/api/notifications/stream`);
     
     eventSource.onmessage = (event) => {
       try {
@@ -390,7 +394,7 @@ class ApiClient {
     onLog: (log: LogEntry) => void,
     onError?: (error: Event) => void
   ): EventSource {
-    const eventSource = new EventSource(`${WS_BASE_URL}/logs/stream`);
+    const eventSource = new EventSource(`${SSE_BASE_URL}/api/logs/stream`);
     
     eventSource.onmessage = (event) => {
       try {

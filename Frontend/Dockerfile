@@ -12,25 +12,14 @@ FROM node:20-alpine AS builder
 # Set working directory
 WORKDIR /app
 
-# Set environment variables for build
-ENV NODE_ENV=production \
-    npm_config_loglevel=warn
-
 # Copy package files first for better caching
 COPY Frontend/package*.json ./
 
-# Install dependencies
-# Use npm install (not npm ci) since package-lock.json may be out of sync
-RUN npm install --no-audit
+# Install all dependencies (including devDependencies for build)
+RUN npm install
 
 # Copy source code (must be after npm install to leverage cache)
-# Copy only source files to avoid overwriting node_modules
-COPY Frontend/src ./src
-COPY Frontend/vite.config.ts ./
-COPY Frontend/index.html ./
-COPY Frontend/tsconfig*.json ./
-COPY Frontend/postcss.config.js ./
-COPY Frontend/tailwind.config.ts ./
+COPY Frontend/ .
 
 # Build the application
 # Build with production mode to minimize bundle size

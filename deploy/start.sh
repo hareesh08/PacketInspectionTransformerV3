@@ -99,7 +99,8 @@ install_python_deps() {
 install_node_deps() {
     log_info "Installing Node.js dependencies..."
     
-    cd "$(dirname "$0")/../Frontend"
+    cd "$(dirname "$0")/.."
+    cd Frontend
     
     # Install dependencies
     npm install
@@ -114,7 +115,8 @@ install_node_deps() {
 build_frontend() {
     log_info "Building frontend..."
     
-    cd "$(dirname "$0")/../Frontend"
+    cd "$(dirname "$0")/.."
+    cd Frontend
     
     # Build for production
     npm run build
@@ -170,7 +172,8 @@ start_backend() {
 start_frontend() {
     log_info "Starting frontend service..."
     
-    cd "$(dirname "$0")/../Frontend"
+    cd "$(dirname "$0")/.."
+    cd Frontend
     
     # Start frontend with PM2 (serve the built files)
     pm2 start "serve -s dist -l 3000" --name "malware-frontend" || pm2 restart malware-frontend

@@ -101,7 +101,7 @@
       <workItem from="1767985823409" duration="464000" />
       <workItem from="1767990399675" duration="930000" />
       <workItem from="1767991499074" duration="56000" />
-      <workItem from="1768033995084" duration="2833000" />
+      <workItem from="1768033995084" duration="3332000" />
     </task>
     <task id="LOCAL-00001" summary="updated ui,notification, deployment">
       <option name="closed" value="true" />
@@ -343,7 +343,23 @@
       <option name="project" value="LOCAL" />
       <updated>1768036612692</updated>
     </task>
-    <option name="localTasksCounter" value="31" />
+    <task id="LOCAL-00031" summary="CICD development">
+      <option name="closed" value="true" />
+      <created>1768036867609</created>
+      <option name="number" value="00031" />
+      <option name="presentableId" value="LOCAL-00031" />
+      <option name="project" value="LOCAL" />
+      <updated>1768036867610</updated>
+    </task>
+    <task id="LOCAL-00032" summary="CICD development">
+      <option name="closed" value="true" />
+      <created>1768036991800</created>
+      <option name="number" value="00032" />
+      <option name="presentableId" value="LOCAL-00032" />
+      <option name="project" value="LOCAL" />
+      <updated>1768036991800</updated>
+    </task>
+    <option name="localTasksCounter" value="33" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

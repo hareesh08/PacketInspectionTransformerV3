@@ -381,17 +381,22 @@ create_env_file() {
 fix_dockerfiles() {
     log_info "Checking and fixing Dockerfiles..."
     
-    # Fix Frontend/Dockerfile - change npm ci to npm install
+    # Fix Frontend/Dockerfile - handle npm install and apt-get/apk
     if [[ -f "Frontend/Dockerfile" ]]; then
-        if grep -q "npm ci --quiet --no-audit" "Frontend/Dockerfile"; then
-            log_info "Fixing Frontend/Dockerfile (npm ci -> npm install)"
-            sed -i 's/npm ci --quiet --no-audit/npm install --quiet --no-audit/g' "Frontend/Dockerfile"
-        fi
-        
         # Fix apt-get to apk for Alpine nginx base image
         if grep -q "apt-get update && apt-get install" "Frontend/Dockerfile"; then
             log_info "Fixing Frontend/Dockerfile (apt-get -> apk)"
             sed -i 's/apt-get update && apt-get install -y --no-install-recommends.*curl.*ca-certificates.*&& rm -rf \/var\/lib\/apt\/lists\*/apk add --no-cache curl ca-certificates/g' "Frontend/Dockerfile"
+        fi
+        
+        # Ensure npm ci is replaced with conditional install (handles missing lock file)
+        if grep -q "RUN npm ci --quiet --no-audit" "Frontend/Dockerfile"; then
+            log_info "Fixing Frontend/Dockerfile (npm ci -> npm install fallback)"
+            # Replace the problematic npm ci line with npm install
+            sed -i 's/RUN npm ci --quiet --no-audit/RUN npm install --no-audit/g' "Frontend/Dockerfile"
+            log_success "Fixed npm ci -> npm install"
+        else
+            log_success "Frontend/Dockerfile npm install is already fixed"
         fi
     fi
     

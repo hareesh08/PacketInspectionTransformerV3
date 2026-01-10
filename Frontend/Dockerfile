@@ -22,7 +22,7 @@ COPY Frontend/package*.json ./
 # Install dependencies (use npm install for better compatibility)
 RUN npm install --quiet --no-audit
 
-# Copy source code
+# Copy source code (must be after npm install to leverage cache)
 COPY Frontend/ .
 
 # Build the application

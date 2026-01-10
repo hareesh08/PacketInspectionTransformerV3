@@ -413,6 +413,8 @@ deploy_containers() {
     
     # Build the images (no cache to ensure latest changes)
     log_info "Building Docker images (this may take a few minutes)..."
+    log_info "Cleaning Docker build cache..."
+    docker builder prune -af 2>/dev/null || true
     docker compose build --no-cache --pull
     
     # Start the services

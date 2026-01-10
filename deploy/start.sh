@@ -164,12 +164,32 @@ build_frontend() {
     log_info "Project root: $PROJECT_ROOT"
     log_info "Current directory: $(pwd)"
     
-    if [ ! -d "$PROJECT_ROOT/Frontend" ]; then
-        log_error "Frontend directory not found at: $PROJECT_ROOT/Frontend"
+    # Find the frontend directory - check multiple possible locations
+    FRONTEND_DIR=""
+    
+    if [ -d "$PROJECT_ROOT/Frontend" ]; then
+        FRONTEND_DIR="$PROJECT_ROOT/Frontend"
+    elif [ -d "$PROJECT_ROOT" ]; then
+        # Check if Frontend folder exists directly in project root
+        for dir in "$PROJECT_ROOT"/*; do
+            if [ -d "$dir" ] && [[ "$dir" == *"Frontend"* ]] || [ -f "$dir/package.json" ]; then
+                FRONTEND_DIR="$dir"
+                break
+            fi
+        done
+    fi
+    
+    if [ -z "$FRONTEND_DIR" ]; then
+        log_error "Frontend directory not found. Checked locations:"
+        log_error "  - $PROJECT_ROOT/Frontend"
+        log_error "  - $PROJECT_ROOT"
+        ls -la "$PROJECT_ROOT" 2>/dev/null || true
         return 1
     fi
     
-    cd "$PROJECT_ROOT/Frontend"
+    log_info "Found frontend directory: $FRONTEND_DIR"
+    
+    cd "$FRONTEND_DIR"
     
     # Build for production
     npm run build

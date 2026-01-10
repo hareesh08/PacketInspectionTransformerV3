@@ -4,9 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="8841923a-3a8c-410b-8e39-f8f2178fb268" name="Changes" comment="NEW1754 CICD development">
-      <change beforePath="$PROJECT_DIR$/deploy/start.sh" beforeDir="false" afterPath="$PROJECT_DIR$/deploy/start.sh" afterDir="false" />
-    </list>
+    <list default="true" id="8841923a-3a8c-410b-8e39-f8f2178fb268" name="Changes" comment="NEW1802 CICD development" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -101,7 +99,7 @@
       <workItem from="1767990399675" duration="930000" />
       <workItem from="1767991499074" duration="56000" />
       <workItem from="1768033995084" duration="4927000" />
-      <workItem from="1768039709934" duration="5381000" />
+      <workItem from="1768039709934" duration="5793000" />
     </task>
     <task id="LOCAL-00001" summary="updated ui,notification, deployment">
       <option name="closed" value="true" />
@@ -423,7 +421,23 @@
       <option name="project" value="LOCAL" />
       <updated>1768047891780</updated>
     </task>
-    <option name="localTasksCounter" value="41" />
+    <task id="LOCAL-00041" summary="NEW1759 CICD development">
+      <option name="closed" value="true" />
+      <created>1768048108675</created>
+      <option name="number" value="00041" />
+      <option name="presentableId" value="LOCAL-00041" />
+      <option name="project" value="LOCAL" />
+      <updated>1768048108675</updated>
+    </task>
+    <task id="LOCAL-00042" summary="NEW1802 CICD development">
+      <option name="closed" value="true" />
+      <created>1768048341886</created>
+      <option name="number" value="00042" />
+      <option name="presentableId" value="LOCAL-00042" />
+      <option name="project" value="LOCAL" />
+      <updated>1768048341886</updated>
+    </task>
+    <option name="localTasksCounter" value="43" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -448,7 +462,9 @@
     <MESSAGE value="CICD development" />
     <MESSAGE value="NEW CICD development" />
     <MESSAGE value="NEW1754 CICD development" />
-    <option name="LAST_COMMIT_MESSAGE" value="NEW1754 CICD development" />
+    <MESSAGE value="NEW1759 CICD development" />
+    <MESSAGE value="NEW1802 CICD development" />
+    <option name="LAST_COMMIT_MESSAGE" value="NEW1802 CICD development" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/PacketInspectionTransformerV3$run.coverage" NAME="run Coverage Results" MODIFIED="1767938496545" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />

@@ -186,6 +186,13 @@ setup_nginx() {
     # Remove default nginx site
     rm -f /etc/nginx/sites-enabled/default
     
+    # Ensure frontend is accessible - copy dist files to nginx html directory
+    if [ -d "$FRONTEND_DIR/dist" ]; then
+        mkdir -p "/var/www/$NGINX_CONFIG_NAME/html"
+        cp -r "$FRONTEND_DIR/dist/"* "/var/www/$NGINX_CONFIG_NAME/html/"
+        log_info "Frontend files copied to /var/www/$NGINX_CONFIG_NAME/html"
+    fi
+    
     # Test nginx configuration
     nginx -t
     

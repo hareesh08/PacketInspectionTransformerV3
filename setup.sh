@@ -5,6 +5,7 @@
 # =============================================================================
 # Fully automatic deployment for production environments
 # Supports access via https://<vmip> with self-signed SSL certificates
+# Includes automatic Docker installation if not present
 # =============================================================================
 
 set -e
@@ -74,6 +75,108 @@ detect_vm_ip() {
     log_success "Detected VM IP: $VM_IP"
 }
 
+# Check and install Docker
+install_docker() {
+    log_info "Installing Docker..."
+    
+    if command -v docker &> /dev/null; then
+        log_success "Docker is already installed"
+        return 0
+    fi
+    
+    # Check OS
+    if [[ -f /etc/os-release ]]; then
+        . /etc/os-release
+        OS=$ID
+    else
+        OS="unknown"
+    fi
+    
+    # Install Docker based on OS
+    if [[ "$OS" == "ubuntu" || "$OS" == "debian" ]]; then
+        log_info "Installing Docker on Ubuntu/Debian..."
+        
+        # Update package index
+        $SUDO apt-get update -qq
+        
+        # Install dependencies
+        $SUDO apt-get install -y -qq apt-transport-https ca-certificates curl gnupg lsb-release
+        
+        # Add Docker's official GPG key
+        $SUDO install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL "https://download.docker.com/linux/${OS}/gpg" | $SUDO gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        $SUDO chmod a+r /etc/apt/keyrings/docker.gpg
+        
+        # Add Docker repository
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/${OS} ${VERSION_CODENAME} stable" | $SUDO tee /etc/apt/sources.list.d/docker.list > /dev/null
+        
+        # Install Docker
+        $SUDO apt-get update -qq
+        $SUDO apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin
+        
+    elif [[ "$OS" == "centos" || "$OS" == "rhel" || "$OS" == "fedora" ]]; then
+        log_info "Installing Docker on CentOS/RHEL/Fedora..."
+        
+        # Install dependencies
+        $SUDO yum install -y -q yum-utils
+        
+        # Add Docker repository
+        $SUDO yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+        
+        # Install Docker
+        $SUDO yum install -y -q docker-ce docker-ce-cli containerd.io docker-compose-plugin
+        
+        # Start Docker
+        $SUDO systemctl start docker
+        $SUDO systemctl enable docker
+        
+    else
+        log_error "Unsupported OS: $OS"
+        log_info "Please install Docker manually and run this script again."
+        exit 1
+    fi
+    
+    # Add current user to docker group
+    if ! groups | grep -q docker; then
+        $SUDO usermod -aG docker $USER
+        log_info "Added current user to docker group (may require logout/login)"
+    fi
+    
+    # Wait for Docker to be ready
+    sleep 3
+    
+    log_success "Docker installed successfully"
+}
+
+# Check and install Docker Compose
+install_docker_compose() {
+    log_info "Checking Docker Compose..."
+    
+    # Check if docker compose plugin is available (new Docker installations)
+    if docker compose version &>/dev/null; then
+        log_success "Docker Compose (plugin) is installed: $(docker compose version)"
+        return 0
+    fi
+    
+    # Check if standalone docker-compose is available
+    if command -v docker-compose &> /dev/null; then
+        log_success "Docker Compose (standalone) is installed: $(docker-compose --version)"
+        return 0
+    fi
+    
+    log_info "Installing Docker Compose..."
+    
+    # Install Docker Compose (standalone)
+    local compose_version="v2.24.5"
+    $SUDO curl -fsSL "https://github.com/docker/compose/releases/download/${compose_version}/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
+    $SUDO chmod +x /usr/local/bin/docker-compose
+    
+    # Create symlink for docker-compose
+    $SUDO ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose 2>/dev/null || true
+    
+    log_success "Docker Compose installed successfully"
+}
+
 # Check prerequisites
 check_prerequisites() {
     log_info "Checking prerequisites..."
@@ -82,16 +185,24 @@ check_prerequisites() {
     
     # Check Docker
     if ! command -v docker &> /dev/null; then
-        log_error "Docker is not installed"
-        missing_deps+=("docker")
+        log_warning "Docker is not installed"
+        if [[ "$AUTO_INSTALL" == "true" ]]; then
+            install_docker
+        else
+            missing_deps+=("docker")
+        fi
     else
         log_success "Docker is installed: $(docker --version)"
     fi
     
     # Check Docker Compose
     if ! command -v docker compose &> /dev/null && ! command -v docker-compose &> /dev/null; then
-        log_error "Docker Compose is not installed"
-        missing_deps+=("docker-compose")
+        log_warning "Docker Compose is not installed"
+        if [[ "$AUTO_INSTALL" == "true" ]]; then
+            install_docker_compose
+        else
+            missing_deps+=("docker-compose")
+        fi
     else
         local compose_version=$(docker compose version 2>/dev/null || docker-compose --version 2>/dev/null)
         log_success "Docker Compose is installed: $compose_version"
@@ -100,6 +211,11 @@ check_prerequisites() {
     # Check Git
     if ! command -v git &> /dev/null; then
         log_warning "Git is not installed"
+        if [[ "$AUTO_INSTALL" == "true" ]]; then
+            log_info "Installing git..."
+            $SUDO apt-get update -qq && $SUDO apt-get install -y -qq git 2>/dev/null || \
+            $SUDO yum install -y -q git 2>/dev/null || true
+        fi
     else
         log_success "Git is installed: $(git --version)"
     fi
@@ -115,6 +231,11 @@ check_prerequisites() {
     # Check curl
     if ! command -v curl &> /dev/null; then
         log_warning "curl is not installed"
+        if [[ "$AUTO_INSTALL" == "true" ]]; then
+            log_info "Installing curl..."
+            $SUDO apt-get update -qq && $SUDO apt-get install -y -qq curl 2>/dev/null || \
+            $SUDO yum install -y -q curl 2>/dev/null || true
+        fi
     fi
     
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
@@ -124,12 +245,28 @@ check_prerequisites() {
     fi
     
     # Check Docker daemon
-    if ! docker info &> /dev/null; then
+    local docker_check=0
+    for i in {1..10}; do
+        if docker info &> /dev/null; then
+            docker_check=1
+            break
+        fi
+        log_info "Waiting for Docker daemon... (attempt $i/10)"
+        sleep 2
+    done
+    
+    if [[ $docker_check -eq 0 ]]; then
         log_error "Docker daemon is not running or you don't have permission to access it."
-        log_info "Please start Docker and add your user to the docker group:"
-        log_info "  sudo systemctl start docker"
-        log_info "  sudo usermod -aG docker \$USER"
-        exit 1
+        log_info "Attempting to start Docker..."
+        $SUDO systemctl start docker 2>/dev/null || $SUDO service docker start 2>/dev/null || true
+        sleep 3
+        
+        if ! docker info &> /dev/null; then
+            log_error "Could not start Docker daemon."
+            log_info "Please start Docker manually:"
+            log_info "  sudo systemctl start docker"
+            exit 1
+        fi
     fi
     
     log_success "All prerequisites are met"
@@ -419,6 +556,9 @@ main() {
     echo "                      Version: ${SCRIPT_VERSION}"
     echo "============================================================================="
     echo ""
+    
+    # Enable auto-install by default for fully automatic deployment
+    AUTO_INSTALL="true"
     
     check_root
     detect_vm_ip

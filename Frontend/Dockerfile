@@ -24,7 +24,13 @@ COPY Frontend/package*.json ./
 RUN npm install --no-audit
 
 # Copy source code (must be after npm install to leverage cache)
-COPY Frontend/ .
+# Copy only source files to avoid overwriting node_modules
+COPY Frontend/src ./src
+COPY Frontend/vite.config.ts ./
+COPY Frontend/index.html ./
+COPY Frontend/tsconfig*.json ./
+COPY Frontend/postcss.config.js ./
+COPY Frontend/tailwind.config.ts ./
 
 # Build the application
 # Build with production mode to minimize bundle size

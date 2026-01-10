@@ -7,6 +7,7 @@ import pytest
 import os
 import sys
 import tempfile
+import torch
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
 

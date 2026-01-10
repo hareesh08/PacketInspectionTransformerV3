@@ -8,7 +8,7 @@ import sys
 import time
 import logging
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List, Tuple, Callable
 from dataclasses import dataclass
 import threading
@@ -621,7 +621,7 @@ class StreamingDetector:
             "risk_level": risk_level,
             "bytes_scanned": bytes_scanned,
             "scan_time_ms": scan_time_ms,
-            "timestamp": datetime.utcnow().isoformat() if hasattr(datetime, 'utcnow') else time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
         # Schedule notification (will be executed if async context is available)

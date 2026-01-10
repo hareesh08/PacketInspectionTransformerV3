@@ -3,7 +3,7 @@ Pydantic v2 data model for API requests and responses.
 Defines schemas for malware detection gateway endpoints.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Any, Dict
 from enum import Enum
 from pydantic import (
@@ -198,7 +198,7 @@ class ScanResult(BaseModel):
         description="Additional details about the scan"
     )
     timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When the scan was performed"
     )
 
@@ -421,7 +421,7 @@ class HealthStatus(BaseModel):
         description="Current memory usage"
     )
     timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When status was checked"
     )
 
@@ -469,7 +469,7 @@ class ErrorResponse(BaseModel):
         description="Additional error details"
     )
     timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When error occurred"
     )
 

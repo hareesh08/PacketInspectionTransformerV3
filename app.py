@@ -10,7 +10,7 @@ import logging
 import asyncio
 import psutil
 import torch
-from datetime import datetime
+from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from typing import Optional
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Depends
@@ -292,7 +292,7 @@ async def get_model_info():
             "dropout": settings.dropout
         },
         "uptime_seconds": time.time() - _start_time,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -320,7 +320,7 @@ def get_log_queue() -> asyncio.Queue:
 async def enqueue_log(level: str, message: str, source: str = "backend"):
     """Add a log entry to the queue for streaming."""
     log_entry = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "level": level.upper(),
         "message": message,
         "source": source
@@ -400,7 +400,7 @@ async def notifications_stream():
                     # Send heartbeat to keep connection alive
                     yield {
                         "event": "heartbeat",
-                        "data": {"timestamp": datetime.utcnow().isoformat()}
+                        "data": {"timestamp": datetime.now(timezone.utc).isoformat()}
                     }
         except asyncio.CancelledError:
             pass
@@ -413,7 +413,7 @@ async def send_test_notification():
     """Send a test notification to all connected clients."""
     await notify_clients("test", {
         "message": "Test notification",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     })
     return {"status": "sent"}
 
@@ -456,7 +456,7 @@ async def logs_stream():
                     # Send heartbeat
                     yield {
                         "event": "heartbeat",
-                        "data": {"timestamp": datetime.utcnow().isoformat()}
+                        "data": {"timestamp": datetime.now(timezone.utc).isoformat()}
                     }
         except asyncio.CancelledError:
             pass
@@ -549,7 +549,7 @@ async def scan_url(request: URLScanRequest, early_termination: bool = False):
             scan_time_ms=result.scan_time_ms,
             status=result.status,
             details=result.details,
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.now(timezone.utc).isoformat()
         )
     
     except Exception as e:
@@ -606,7 +606,7 @@ async def scan_file(
             scan_time_ms=result.scan_time_ms,
             status=result.status,
             details=result.details,
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.now(timezone.utc).isoformat()
         )
     
     except HTTPException:
@@ -661,7 +661,7 @@ async def get_threats(
                 probability=threat_dict.get('probability', 0.0),
                 bytes_scanned=threat_dict.get('bytes_scanned', 0),
                 risk_level=RiskLevel(threat_dict.get('risk_level', 'BENIGN')),
-                timestamp=threat_dict.get('timestamp', datetime.utcnow().isoformat()),
+                timestamp=threat_dict.get('timestamp', datetime.now(timezone.utc).isoformat()),
                 details=threat_dict.get('details'),
                 blocked=threat_dict.get('blocked', False)
             ))

@@ -701,7 +701,22 @@ async def get_threat_stats():
 async def get_threat_distribution():
     """Get threat distribution by risk level."""
     threat_manager = get_threat_manager_instance()
-    return threat_manager.get_risk_distribution()
+    distribution_list = threat_manager.get_risk_distribution()
+    
+    distribution = {
+        "BENIGN": 0,
+        "LOW": 0,
+        "MEDIUM": 0,
+        "HIGH": 0,
+        "CRITICAL": 0
+    }
+    
+    for item in distribution_list:
+        risk_level = item.get("risk_level", "BENIGN")
+        count = item.get("count", 0)
+        distribution[risk_level] = count
+    
+    return distribution
 
 
 @app.get("/threats/{threat_id}", tags=["Threats"])

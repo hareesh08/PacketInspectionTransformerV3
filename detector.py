@@ -417,6 +417,8 @@ class StreamingDetector:
         buffer = bytearray()
         bytes_scanned = 0
         max_probability = 0.0
+        sum_probability = 0.0
+        chunk_count = 0
         early_termination_active = False
         
         logger.info(f"Starting URL scan: {url} (early_termination={use_early_termination})")
@@ -447,6 +449,8 @@ class StreamingDetector:
                     # Run inference
                     probability = self.infer(bytes(buffer))
                     max_probability = max(max_probability, probability)
+                    sum_probability += probability
+                    chunk_count += 1
                     
                     # Progress callback
                     if progress_callback:
@@ -461,26 +465,49 @@ class StreamingDetector:
                             )
                             early_termination_active = True
                             scan_time_ms = (time.perf_counter() - start_time) * 1000
+                            avg_probability = sum_probability / chunk_count if chunk_count > 0 else 0.0
                             return self._create_blocked_result(
                                 url, "URL", probability, bytes_scanned, scan_time_ms,
-                                details={"early_termination": True}
+                                details={
+                                    "early_termination": True,
+                                    "max_probability": max_probability,
+                                    "avg_probability": avg_probability,
+                                    "chunks_scanned": chunk_count
+                                }
                             )
-                    
-                    # Standard threshold check
-                    if probability >= self.confidence_threshold:
-                        logger.warning(f"Threat detected mid-download: {probability:.4f}")
-                        
-                        # Log and return blocked result
-                        scan_time_ms = (time.perf_counter() - start_time) * 1000
-                        return self._create_blocked_result(
-                            url, "URL", probability, bytes_scanned, scan_time_ms
-                        )
+                
+                # Calculate average probability across all chunks
+                avg_probability = sum_probability / chunk_count if chunk_count > 0 else 0.0
+                
+                # Standard mode: use average probability for final decision
+                scan_time_ms = (time.perf_counter() - start_time) * 1000
+                
+                logger.info(
+                    f"URL scan complete: {url} - "
+                    f"avg_prob={avg_probability:.4f}, max_prob={max_probability:.4f}, "
+                    f"chunks={chunk_count}, bytes={bytes_scanned}"
+                )
+                
+                # Check if average probability exceeds threshold
+                if avg_probability >= self.confidence_threshold:
+                    logger.warning(f"Threat detected (average): {avg_probability:.4f}")
+                    return self._create_blocked_result(
+                        url, "URL", avg_probability, bytes_scanned, scan_time_ms,
+                        details={
+                            "max_probability": max_probability,
+                            "avg_probability": avg_probability,
+                            "chunks_scanned": chunk_count
+                        }
+                    )
                 
                 # Clean scan
-                scan_time_ms = (time.perf_counter() - start_time) * 1000
                 return self._create_clean_result(
-                    url, "URL", max_probability, bytes_scanned, scan_time_ms,
-                    details={"early_termination_attempted": early_termination_active}
+                    url, "URL", avg_probability, bytes_scanned, scan_time_ms,
+                    details={
+                        "max_probability": max_probability,
+                        "avg_probability": avg_probability,
+                        "chunks_scanned": chunk_count
+                    }
                 )
                 
         except requests.RequestException as e:
@@ -527,6 +554,8 @@ class StreamingDetector:
         buffer = bytearray()
         bytes_scanned = 0
         max_probability = 0.0
+        sum_probability = 0.0
+        chunk_count = 0
         early_termination_active = False
         
         logger.info(f"Starting file scan: {filename} ({len(file_data)} bytes) (early_termination={use_early_termination})")
@@ -543,6 +572,8 @@ class StreamingDetector:
             # Run inference
             probability = self.infer(bytes(buffer))
             max_probability = max(max_probability, probability)
+            sum_probability += probability
+            chunk_count += 1
             
             # Early termination check (fast block mode)
             if use_early_termination and bytes_scanned >= self.early_termination_min_bytes:
@@ -553,25 +584,49 @@ class StreamingDetector:
                     )
                     early_termination_active = True
                     scan_time_ms = (time.perf_counter() - start_time) * 1000
+                    avg_probability = sum_probability / chunk_count if chunk_count > 0 else 0.0
                     return self._create_blocked_result(
                         filename, "FILE", probability, bytes_scanned, scan_time_ms,
-                        details={"early_termination": True}
+                        details={
+                            "early_termination": True,
+                            "max_probability": max_probability,
+                            "avg_probability": avg_probability,
+                            "chunks_scanned": chunk_count
+                        }
                     )
-            
-            # Standard threshold check
-            if probability >= self.confidence_threshold:
-                logger.warning(f"Threat detected in file: {probability:.4f}")
-                
-                scan_time_ms = (time.perf_counter() - start_time) * 1000
-                return self._create_blocked_result(
-                    filename, "FILE", probability, bytes_scanned, scan_time_ms
-                )
+        
+        # Calculate average probability across all chunks
+        avg_probability = sum_probability / chunk_count if chunk_count > 0 else 0.0
+        
+        # Standard mode: use average probability for final decision
+        scan_time_ms = (time.perf_counter() - start_time) * 1000
+        
+        logger.info(
+            f"File scan complete: {filename} - "
+            f"avg_prob={avg_probability:.4f}, max_prob={max_probability:.4f}, "
+            f"chunks={chunk_count}, bytes={bytes_scanned}"
+        )
+        
+        # Check if average probability exceeds threshold
+        if avg_probability >= self.confidence_threshold:
+            logger.warning(f"Threat detected (average): {avg_probability:.4f}")
+            return self._create_blocked_result(
+                filename, "FILE", avg_probability, bytes_scanned, scan_time_ms,
+                details={
+                    "max_probability": max_probability,
+                    "avg_probability": avg_probability,
+                    "chunks_scanned": chunk_count
+                }
+            )
         
         # Clean scan
-        scan_time_ms = (time.perf_counter() - start_time) * 1000
         return self._create_clean_result(
-            filename, "FILE", max_probability, bytes_scanned, scan_time_ms,
-            details={"early_termination_attempted": early_termination_active}
+            filename, "FILE", avg_probability, bytes_scanned, scan_time_ms,
+            details={
+                "max_probability": max_probability,
+                "avg_probability": avg_probability,
+                "chunks_scanned": chunk_count
+            }
         )
     
     async def _send_notification(self, event_type: str, data: dict):

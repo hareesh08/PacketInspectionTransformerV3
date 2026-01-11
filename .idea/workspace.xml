@@ -4,7 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="8841923a-3a8c-410b-8e39-f8f2178fb268" name="Changes" comment="NEW1802 CICD development" />
+    <list default="true" id="8841923a-3a8c-410b-8e39-f8f2178fb268" name="Changes" comment="NEW1802 CICD development">
+      <change beforePath="$PROJECT_DIR$/Frontend/.env" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/.env" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Frontend/src/lib/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/src/lib/api.ts" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />

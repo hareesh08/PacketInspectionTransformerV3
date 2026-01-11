@@ -14,13 +14,13 @@ const isLocalhost = window.location.hostname === 'localhost' || window.location.
 function getApiBaseUrl(): string {
   const envUrl = import.meta.env.VITE_API_URL;
   
-  // If explicitly set, use it
-  if (envUrl && envUrl !== 'auto') {
+  // If explicitly set to a full URL, use it
+  if (envUrl && (envUrl.startsWith('http://') || envUrl.startsWith('https://'))) {
     return envUrl;
   }
   
-  // Auto-detection logic
-  if (isLocalhost) {
+  // Auto-detection logic for localhost and production
+  if (isLocalhost || !isProduction) {
     // Local development: use localhost with configured port
     const port = import.meta.env.VITE_API_PORT || '8000';
     return `http://localhost:${port}`;
@@ -35,12 +35,12 @@ function getSSEUrl(): string {
   // For SSE, we use HTTP/HTTPS protocol, not WebSocket
   const apiUrl = getApiBaseUrl();
   
-  // If using relative URLs (nginx proxy), return relative path
+  // If using relative URLs (nginx proxy), return empty base (paths start with /api/)
   if (apiUrl.startsWith('/')) {
     return '';  // Empty base for relative URLs
   }
   
-  // For absolute URLs, return the base URL
+  // For absolute URLs (localhost), return the base URL without /api
   return apiUrl;
 }
 
@@ -331,7 +331,9 @@ class ApiClient {
     onMessage: (notification: Notification) => void,
     onError?: (error: Event) => void
   ): EventSource {
-    const eventSource = new EventSource(`${SSE_BASE_URL}/api/notifications/stream`);
+    // Use /api prefix only for nginx proxy (relative URLs), direct for localhost
+    const notificationsPath = SSE_BASE_URL ? '/notifications/stream' : '/api/notifications/stream';
+    const eventSource = new EventSource(`${SSE_BASE_URL}${notificationsPath}`);
     
     eventSource.onmessage = (event) => {
       try {
@@ -394,7 +396,9 @@ class ApiClient {
     onLog: (log: LogEntry) => void,
     onError?: (error: Event) => void
   ): EventSource {
-    const eventSource = new EventSource(`${SSE_BASE_URL}/api/logs/stream`);
+    // Use /api prefix only for nginx proxy (relative URLs), direct for localhost
+    const logsPath = SSE_BASE_URL ? '/logs/stream' : '/api/logs/stream';
+    const eventSource = new EventSource(`${SSE_BASE_URL}${logsPath}`);
     
     eventSource.onmessage = (event) => {
       try {
